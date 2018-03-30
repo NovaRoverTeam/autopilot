@@ -1,12 +1,24 @@
 #!/usr/bin/env python
+
+# Template for the high level route planning node, which has a subscription
+# to the GPS node, and hosts a service called "Calc_Route" for providing a 
+# route to the autopilot.
+#
+# run this with "rosrun autopilot glen.py"
+#   if this doesn't work, make sure it has execute permission
+#     - go to the containing folder and run 'chmod a+x glen.py'
+#   also 'roscore' must be running
+
 import rospy
 from gps.msg import Gps # Import our custom ROS message for GPS data
-from autopilot.srv import calc_route # Import service msg for route plan
+from autopilot.srv import * # Import service message for route plan
 
 
 def Calc_Route(req):
 
     req.destination # Do something with the Gps coordinate of destination
+
+    print req.destination # testing
 
     # Initialise list of route coords, the type must be the ROS msg Gps
     route = [] 
@@ -16,10 +28,14 @@ def Calc_Route(req):
     response = calc_routeResponse() # Create the service response message
 
     gps_coord = Gps() # Create an individual GPS coordinate
-    gps_coord.latitude = -37.123432  # Set latitude and longitude to whatever
-    gps_coord.longitude = 144.572783
-
+    gps_coord.latitude = -555.555  # Set latitude and longitude to whatever
+    gps_coord.longitude = 123.12345
     route.append(gps_coord) # Append the coordinate to the route list
+
+    gps_coord = Gps() # Add another coordinate to list
+    gps_coord.latitude = -666.666
+    gps_coord.longitude = 123.45678
+    route.append(gps_coord) 
 
     response.route = route # Give route list to the service response
 

@@ -132,7 +132,7 @@ add_dependencies(autopilot ${catkin_EXPORTED_TARGETS} autopilot_generate_message
 target_link_libraries(autopilot ${catkin_LIBRARIES})
 
 ## Declare a Python executable
-catkin_install_python(PROGRAMS scripts/glen.py
+catkin_install_python(PROGRAMS scripts/glen.py scripts/test_client.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 
