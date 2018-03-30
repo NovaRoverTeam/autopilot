@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  gps
 )
 
 ## System dependencies are found with CMake's conventions
@@ -50,11 +51,10 @@ find_package(catkin REQUIRED COMPONENTS
 #)
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+ add_service_files(
+   FILES
+   calc_route.srv
+ )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -65,8 +65,9 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
-  DEPENDENCIES
+  DEPENDENCIES 
   std_msgs
+  gps
 )
 
 ################################################
@@ -101,7 +102,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES GPS
-  CATKIN_DEPENDS message_runtime message_generation roscpp rospy std_msgs
+  CATKIN_DEPENDS message_runtime message_generation roscpp rospy std_msgs gps
 #  DEPENDS system_lib
 )
 
@@ -129,6 +130,12 @@ include_directories(include  ${catkin_INCLUDE_DIRS})
 add_executable(autopilot src/autopilot.cpp)
 add_dependencies(autopilot ${catkin_EXPORTED_TARGETS} autopilot_generate_messages_cpp)
 target_link_libraries(autopilot ${catkin_LIBRARIES})
+
+## Declare a Python executable
+catkin_install_python(PROGRAMS scripts/glen.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
