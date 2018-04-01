@@ -13,12 +13,225 @@ import rospy
 from gps.msg import Gps # Import our custom ROS message for GPS data
 from autopilot.srv import * # Import service message for route plan
 
+# NOTE: verify all imports are requried
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import networkx as nx
+from math import radians, sin, cos, sqrt, asin, degrees, atan, floor
 
+
+#Other functions*****************************************************************************************
+class MapDetails:# =================================================================================
+        def Haversine(planetRadius, lat1, long1, lat2, long2):
+        """Calculates the distance inbetween two GPS coordinates on a planet"""
+        dLat = radians(lat2 - lat1)
+        dLon = radians(long2 - long1)
+        lat1 = radians(lat1)
+        lat2 = radians(lat2)
+
+        a = sin(dLat/2)**2 + cos(lat1)*cos(lat2)*sin(dLon/2)**2
+        c = 2*asin(sqrt(a))
+        return planetRadius * c
+    
+    def TestMapDimensionInfo(mapImg, planet, lat1, long1, lat2, long2):
+        """Checks the dimesntions of a graph and returns the incremental change in the latitude/latitude"""
+        if(planet == 1):#1=earth, 0=mars
+            planetRadius = 6378137 #earth
+        else:
+            planetRadius = 3396200 #mars
+        # count number of pixels from current location to find distance N, S, E, W etc.
+        latDiff = lat1 - lat2
+        longDiff = long1 - long2
+        latNumCoords = mapImg.shape[0]
+        longNumCoords = mapImg.shape[1]
+        pixelIncrementLong = longDiff/longNumCoords
+        pixelIncrementLat = latDiff/latNumCoords
+
+        #NOTE: shouldn't there be a 5x5 m square
+        newCoordDistLat = lat1 + pixelIncrementLat
+        newCoordDistLong = long1 + pixelIncrementLong
+
+        latitude1 = 0
+        longitude2 = long1
+        latitude2 = pixelIncrementLat
+        longitude1 = long1
+        distance = MapDetails.Haversine(planetRadius, latitude1, longitude1, latitude2, longitude2)
+        print("Distance on Planet for pixel hight", distance)
+
+        longitude2 = pixelIncrementLong
+        latitude2 = lat1
+        latitude1 = lat1
+        longitude1 = 0
+        distance = MapDetails.Haversine(planetRadius,latitude1, longitude1, latitude2, longitude2)
+        print("Distance on Planet for pixel width", distance)
+
+        longitude2 = long1
+        longitude1 = long1
+        latitude1 = lat1
+        latitude2 = lat2
+        distance = MapDetails.Haversine(planetRadius,latitude1, longitude1, latitude2, longitude2)
+        print("Distance on Planet for hight of map", distance)
+
+        latitude2 = lat1
+        latitude1 = lat1
+        longitude1 = long1
+        longitude2 = long2
+        distance = MapDetails.Haversine(planetRadius,latitude1, longitude1, latitude2, longitude2)
+        print("Distance on Planet for width of map", distance)
+        return pixelIncrementLat, pixelIncrementLong
+#end class MapDetails -------------------------------------------------------------------------------------
+
+class PrintRoute: # ===========================================================================================
+    def PrintRouteGraph(g, routeLat1, routeLong1, routeLat2, routeLong2):
+        """Printing route will be included with zoomable visualisation, for now unused sections have been removed/
+        commented. Used to determine the route"""
+        path=nx.shortest_path(g) # source,target not specified
+        route = path[(routeLat1,routeLong1)][(routeLat2,routeLong2)]
+        return route #, subgraphColours
+
+    def PrintGPSRoute(graph, desiredRoute):      # Round GPS coordinates to 6 decimal places
+        #print(nx.get_node_attributes(g, 'gpsCoordinate'))
+        routeGPSCoord = []
+        for i in range(len(desiredRoute)):
+            routeGPSCoord.append(graph.nodes[desiredRoute[i]]['gpsCoordinate'])
+        return routeGPSCoord
+
+    def FindNodeFromGPS(nodeLat, nodeLong, latBoundaryTL, longBoundaryTL,latBoundaryBR, longBoundaryBR, nodeGPSIncrementLat, nodeGPSIncrementLong):
+        """Finds the nearest node label from a GPS coordinate, given the graph/map GPS boundaries"""
+        #check nodeLat and nodeLong are within the range of the graph 
+        if(nodeLat < latBoundaryTL and nodeLat > latBoundaryBR):
+            print("The GPS latitude recived is outside of the graph range")
+            # set to the nearest value - take the most direct route to this node
+        if(nodeLat < longBoundaryTL and nodeLat > longBoundaryBR):
+            print("The GPS longitude recived is outside of the graph range")
+            # set to the nearest value - take the most direct route to this node
+            
+        print('node lat:',nodeLat)
+        print('latBoundaryTL:',latBoundaryTL)
+        print('nodeGPSIncrementLat:',nodeGPSIncrementLat)
+        print('nodeGPSIncrementLong:',nodeGPSIncrementLong)
+        unroundedNodeLat =   (nodeLat - latBoundaryTL) /  nodeGPSIncrementLat
+        unroundedNodeLong =  (nodeLong - longBoundaryTL) / nodeGPSIncrementLong
+        print('unroundedNodeLat',unroundedNodeLat)
+        nodeNameX = round(unroundedNodeLat)
+        nodeNameY = round(unroundedNodeLong)
+        scalingFactorLat = unroundedNodeLat - nodeLat #Direction included
+        scalingFactorLong = unroundedNodeLong - nodeLong
+        print('scalingFactorLat:', scalingFactorLat)
+        
+        #attempt to find the nearest route if GPS coordinate out of range- direct link in the required direciton then call a route
+
+        return nodeNameX, nodeNameY,scalingFactorLat, scalingFactorLong  #returns the corresponding node
+        # include the error of position from this node 
+        # scale but the distance to be traversed
+        
+
+    def CallRoute(g, routeLat1, routeLong1, routeLat2, routeLong2):
+        # call route through graph 
+        # Route Lat and Long are currently node coordinates 
+       
+        #route, subgraphColours = PrintRoute.PrintRouteGraph(g, routeLat1, routeLong1, routeLat2, routeLong2)
+        route = PrintRoute.PrintRouteGraph(g, routeLat1, routeLong1, routeLat2, routeLong2)
+        gpsCoordRoute = nx.get_node_attributes(g,'gpsCoordinate')
+        #print(nx.get_node_attributes(g, 'gpsCoordinate'))
+
+        plt.show()
+
+        routeGPS = PrintRoute.PrintGPSRoute(g, route)
+        print('-----------')
+        
+        #print(routeGPS)
+        routeGPSList = []
+        for i in range(len(routeGPS)):
+            for j in range(len(routeGPS[i])):
+                #routeGPS[i][j] =  Decimal(round(routeGPS[i][j], 6))
+                routeGPSList.append(round(routeGPS[i][j], 6))
+                #print(routeGPS[i][j])
+        print('GPS Coordinates of Rotue:\n',routeGPSList)
+        return routeGPSList
+    #end class PrintRoute ---------------------------------------------------------------------------------
+    
+class ConvertDist2GPSCoord:# =================================================================================
+    def DeltaGPSCoord(bearing):     
+        deltaLatitude = distance*cos(bearing)  # angle taken from the y axis 
+        deltaLongitude = distance*sin(bearing)
+        #print("deltaLongitude:",deltaLongitude )
+        #convert distance into GPS coordinates -  0.00001 decimal degree increase per 0.787m for E/W at 45N/S
+        deltaLatitudeGPS = deltaLatitude/distPerDegLat
+        deltaLongitudeGPS = deltaLongitude/distPerDegLong
+        #print("detaLatitudeGPS:", detaLatitudeGPS)
+        #print("detaLongitudeGPS:",detaLongitudeGPS)
+        return deltaLatitudeGPS, deltaLongitudeGPS
+
+    def DetermineDestGPSCoord(bearing, distance, currentRoverLat, currentRoverLong): 
+        ##NOTE: Calc from distance to GPS coord pair changes depending on locaiton on earth. May need to alter approximation for 
+        # Utah - https://en.wikipedia.org/wiki/Decimal_degrees 
+        distPerDegLat =  110574 #m/degree
+        distPerDegLong = (111320*cos(radians(currentRoverLat))) #m/degree
+        
+        if(bearing>=0 and bearing<=90): #quadreant 1 #NOTE: distance of conversion is in meters
+            deltaLatitude, deltaLongitude = DeltaGPSCoord(bearing)
+            destinationLat = currentRoverLat + deltaLatitude
+            destinationLong = currentRoverLong + deltaLongitude
+            # convert distance in meters to a longitude/latitude 
+            
+        elif(bearing <= 180 and bearing >90): # quadrant 4 
+            modifiedAngle = bearing - 90
+            deltaLatitude, deltaLongitude = DeltaGPSCoord(bearing)
+            destinationLat = currentRoverLat - deltaLatitude
+            destinationLong = currentRoverLong + deltaLongitude
+            
+        elif(bearing <= 270 and bearing>180): #quadrant 3 
+            modifiedAngle = bearing - 180
+            deltaLatitude, deltaLongitude = DeltaGPSCoord(bearing)
+            destinationLat = currentRoverLat - deltaLatitude
+            destinationLong = currentRoverLong - deltaLongitude
+            
+        elif(bearing <360 and bearing >270): #quadent 2
+            modifiedAngle = bearing - 270
+            deltaLatitude, deltaLongitude = DeltaGPSCoord(bearing)
+            destinationLat = currentRoverLat + deltaLatitude
+            destinationLong = currentRoverLong - deltaLongitude
+            
+        else: 
+            print("ERROR: The compass input out of range and must be inbetween 0-360 degrees!")
+            
+        return destinationLat, destinationLong
+    #end class ConvertDist2GPSCoord ---------------------------------------------------------------------------------
+
+#end other functions *************************************************************************************
 def Calc_Route(req):
+    # load in map
+    if(mapLoadFlag ==0):
+        farmGraph = nx.read_gpickle("farmGraph45.gpickle") #load in pre-processed graph, must be in same directory
+        mapLoadFlag = 1
+    
+    # Destination can be GPS or a distance + true bearing
+    if(flagDestGPS == False): #HELPPP: how has ben flagged this????
+        # convert distance to a GPS coordinate
+        destRoverLat, destRoverLong = ConvertDist2GPSCoord.DetermineDestGPSCoord(bearing, req.distance, currentRoverLat, currentRoverLong) #HELPPP!! how do i access the current GPS???
+        # set flag to FlagDestGPS to True
+        flagDestGPS = True
+        
+    if(flagDestGPS== True): # call route through graph 
+        # find the nodes which correspond the current and destination GPS coordinates
+        destRoverLat = req.destination.latitude # Do something with the Gps coordinate of destination # HELPPP!!! Ask ben if format is correct!!
+        destRoverLong = req.destination.longitude
 
-    req.destination # Do something with the Gps coordinate of destination
+        
+        #print(req.destination) # testing
+        lat1Farm = -36.570556 #values used to select a smalller region in DEM file
+        lat2Farm = -36.557778
+        long2Farm = 146.629722 
+        long1Farm = 146.600278
+        currentNodeLat, currentNodeLong, currentDistScalingFactorLat, currentDistScalingFactorLong = PrintRoute.FindNodeFromGPS(currentRoverLat, currentRoverLong, lat1Farm, long1Farm,lat2Farm, long2Farm, pixelIncrementLatFarm, pixelIncrementLongFarm)
+        destNodeLat, destNodeLong, destDistScalingFactorLat, destDistScalingFactorLong = PrintRoute.FindNodeFromGPS(destRoverLat, destRoverLong, lat1Farm, long1Farm, lat2Farm, long2Farm, pixelIncrementLatFarm, pixelIncrementLongFarm)
 
-    print req.destination # testing
+        # find route through graph
+        gpsRoute = CallRoute(farmGraph, currentNodeLat, currentNodeLong, destNodeLat, destNodeLong)
+
+    
 
     # Initialise list of route coords, the type must be the ROS msg Gps
     route = [] 
@@ -26,16 +239,17 @@ def Calc_Route(req):
     # *** TODO GENERATE THE ROUTE HERE, see examples below ***
 
     response = calc_routeResponse() # Create the service response message
+    #HELP: should i put the route in this format??
+    for i in range(0,len(route),2):
+        gps_coord = Gps() # Create an individual GPS coordinate
+        gps_coord.latitude = gpsRoute[i]  # Set latitude and longitude to whatever
+        gps_coord.longitude = gpsRoute[i+1]
+        route.append(gps_coord) # Append the coordinate to the route list
 
-    gps_coord = Gps() # Create an individual GPS coordinate
-    gps_coord.latitude = -555.555  # Set latitude and longitude to whatever
-    gps_coord.longitude = 123.12345
-    route.append(gps_coord) # Append the coordinate to the route list
-
-    gps_coord = Gps() # Add another coordinate to list
-    gps_coord.latitude = -666.666
-    gps_coord.longitude = 123.45678
-    route.append(gps_coord) 
+    #gps_coord = Gps() # Add another coordinate to list
+    #gps_coord.latitude = -666.666
+    #gps_coord.longitude = 123.45678
+    #route.append(gps_coord) 
 
     response.route = route # Give route list to the service response
 
@@ -43,15 +257,24 @@ def Calc_Route(req):
 
     return response # Return the response to the service request - the route.
 
+def Grid_Size(req):
+
+    response = grid_sizeResponse() # Create the service response message
+
+    response.lat_size = -6.620725388603314e-05 #hard coded in from processing map
+    response.long_size = 8.294084507037695e-05
+    
+    return response # Return the response to the service request
+
 
 def GPS_Callback(gps_msg):
     # This callback function runs whenever the GPS node publishes the 
     # GPS coordinate location of the rover (frequently).
 
-    # TODO erhaps store these in global variables? Do something with them
-    gps_msg.latitude  # Current latitude
-    gps_msg.longitude # Current longitude
-    
+    # TODO perhaps store these in global variables? Do something with them
+    currentRoverLat = gps_msg.latitude  # Current latitude
+    currentRoverLong = gps_msg.longitude # Current longitude
+    #return currentLat, currentLong #HELP: return these?
 
 def glen():
     # Initialise the ROS node "glen", for high-level route planning
@@ -63,6 +286,9 @@ def glen():
 
     # Sets up the Calc_Route service, to generate the GPS route.
     serv = rospy.Service('Calc_Route', calc_route, Calc_Route)
+
+    # Sets up the Grid_Size service, to find lat and long distance between grid units.
+    serv = rospy.Service('Grid_Size', grid_size, Grid_Size)
 
     while not rospy.is_shutdown():      
       # TODO anything that needs to run continuously, put in here
