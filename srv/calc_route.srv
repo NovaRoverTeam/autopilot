@@ -1,7 +1,10 @@
 # Service request
 
 # GPS coordinate of the destination to autonomously navigate to. 
-gps/Gps destination 
+bool latlng         # True means GPS coordinate, False means bearing + distance
+gps/Gps destination # GPS coordinate of destination
+float32 bearing     # Angle corresponding to bearing of destination
+float32 distance    # Distance to destination
 
 ---
 
