@@ -27,7 +27,10 @@ mapLoadFlag = 0
 
 #Other functions*****************************************************************************************
 class MapDetails:# =================================================================================
+
     def Haversine(planetRadius, lat1, long1, lat2, long2):
+
+        def Haversine(planetRadius, lat1, long1, lat2, long2):
         """Calculates the distance inbetween two GPS coordinates on a planet"""
         dLat = radians(lat2 - lat1)
         dLon = radians(long2 - long1)
