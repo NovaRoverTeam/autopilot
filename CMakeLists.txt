@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   gps
+  sensor_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -46,9 +47,10 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ##Generate messages in the 'msg' folder
-#add_message_files(
-#  FILES
-#)
+add_message_files(
+  FILES
+  nav.msg
+)
 
 ## Generate services in the 'srv' folder
  add_service_files(
@@ -131,6 +133,13 @@ include_directories(include  ${catkin_INCLUDE_DIRS})
 add_executable(autopilot src/autopilot.cpp)
 add_dependencies(autopilot ${catkin_EXPORTED_TARGETS} autopilot_generate_messages_cpp)
 target_link_libraries(autopilot ${catkin_LIBRARIES})
+
+
+add_executable(short_range_nav src/nav.cpp src/point.cpp)
+target_link_libraries(short_range_nav ${catkin_LIBRARIES})
+target_link_libraries(short_range_nav ${GSL_LIBRARIES})
+add_dependencies(short_range_nav sensor_msgs std_msgs)
+
 
 ## Declare a Python executable
 catkin_install_python(PROGRAMS scripts/glen.py scripts/test_client.py
