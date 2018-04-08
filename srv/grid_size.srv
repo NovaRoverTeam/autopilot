@@ -1,0 +1,8 @@
+# Service request
+
+---
+
+# Service response
+
+float32 lat_size
+float32 long_size

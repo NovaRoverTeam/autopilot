@@ -1,0 +1,14 @@
+# Service request
+
+# GPS coordinate of the destination to autonomously navigate to. 
+bool latlng         # True means GPS coordinate, False means bearing + distance
+gps/Gps destination # GPS coordinate of destination
+float32 bearing     # Angle corresponding to bearing of destination
+float32 distance    # Distance to destination
+
+---
+
+# Service response
+
+# This is a list of ROS msgs. "Gps" is a ROS message in the GPS node, and the brackets indicate that we're creating a list with type "Gps".
+gps/Gps[] route 
