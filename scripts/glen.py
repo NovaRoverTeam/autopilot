@@ -204,7 +204,7 @@ class ConvertDist2GPSCoord:# ===================================================
 def Calc_Route(req):
     # load in map
     if(mapLoadFlag ==0):  
-        farmGraph = nx.read_gpickle("farmGraph.gpickle") #load in pre-processed graph, must be in same directory
+        farmGraph = nx.read_gpickle("monashGraph.gpickle") #load in pre-processed graph, must be in same directory
         mapLoadFlag = 1
     
     # Destination can be GPS or a distance + true bearing
