@@ -29,18 +29,16 @@ mapLoadFlag = 0
 class MapDetails:# =================================================================================
 
     def Haversine(planetRadius, lat1, long1, lat2, long2):
+		"""Calculates the distance inbetween two GPS coordinates on a planet"""
+		dLat = radians(lat2 - lat1)
+		dLon = radians(long2 - long1)
+		lat1 = radians(lat1)
+		lat2 = radians(lat2)
 
-        def Haversine(planetRadius, lat1, long1, lat2, long2):
-        """Calculates the distance inbetween two GPS coordinates on a planet"""
-        dLat = radians(lat2 - lat1)
-        dLon = radians(long2 - long1)
-        lat1 = radians(lat1)
-        lat2 = radians(lat2)
+		a = sin(dLat/2)**2 + cos(lat1)*cos(lat2)*sin(dLon/2)**2
+		c = 2*asin(sqrt(a))
+		return planetRadius * c
 
-        a = sin(dLat/2)**2 + cos(lat1)*cos(lat2)*sin(dLon/2)**2
-        c = 2*asin(sqrt(a))
-        return planetRadius * c
-    
     def TestMapDimensionInfo(mapImg, planet, lat1, long1, lat2, long2):
         """Checks the dimesntions of a graph and returns the incremental change in the latitude/latitude"""
         if(planet == 1):#1=earth, 0=mars
@@ -153,6 +151,9 @@ class PrintRoute: # ============================================================
     #end class PrintRoute ---------------------------------------------------------------------------------
     
 class ConvertDist2GPSCoord:# =================================================================================
+	global currentRoverLat
+    global currentRoverLong
+
     def DeltaGPSCoord(bearing):     
         deltaLatitude = distance*cos(bearing)  # angle taken from the y axis 
         deltaLongitude = distance*sin(bearing)
@@ -202,15 +203,23 @@ class ConvertDist2GPSCoord:# ===================================================
 
 #end other functions *************************************************************************************
 def Calc_Route(req):
+	global mapLoadFlag
+	global currentRoverLat
+    global currentRoverLong
+
+	rospy.loginfo("Calc_Route service has been called ~ Glen")
+
     # load in map
     if(mapLoadFlag ==0):  
         farmGraph = nx.read_gpickle("monashGraph.gpickle") #load in pre-processed graph, must be in same directory
+		rospy.loginfo("Graph has been loaded ~ Glen")
         mapLoadFlag = 1
     
     # Destination can be GPS or a distance + true bearing
     if(req.latlng == False): #HELPPP: how has ben flagged this????
         # convert distance to a GPS coordinate
         destRoverLat, destRoverLong = ConvertDist2GPSCoord.DetermineDestGPSCoord(req.bearing, req.distance, currentRoverLat, currentRoverLong) 
+		rospy.loginfo("find destinatoin~ Glen")
         # set flag to FlagDestGPS to True
         req.latlng = True
         
@@ -220,10 +229,10 @@ def Calc_Route(req):
         destRoverLong = req.destination.longitude
 
         #print(req.destination) # testing
-        lat1Farm = -36.570556 #values used to select a smalller region in DEM file
-        lat2Farm = -36.557778
-        long2Farm = 146.629722 
-        long1Farm = 146.600278
+        #lat1Farm = -36.570556 #values used to select a smalller region in DEM file
+        #lat2Farm = -36.557778
+        #long2Farm = 146.629722 
+        #long1Farm = 146.600278
         currentNodeLat, currentNodeLong, currentDistScalingFactorLat, currentDistScalingFactorLong = PrintRoute.FindNodeFromGPS(currentRoverLat, currentRoverLong, lat1Farm, long1Farm,lat2Farm, long2Farm, pixelIncrementLatFarm, pixelIncrementLongFarm)
         destNodeLat, destNodeLong, destDistScalingFactorLat, destDistScalingFactorLong = PrintRoute.FindNodeFromGPS(destRoverLat, destRoverLong, lat1Farm, long1Farm, lat2Farm, long2Farm, pixelIncrementLatFarm, pixelIncrementLongFarm)
 
@@ -258,6 +267,9 @@ def Grid_Size(req):
 
 
 def GPS_Callback(gps_msg):
+	global currentRoverLat
+    global currentRoverLong
+
     # This callback function runs whenever the GPS node publishes the 
     # GPS coordinate location of the rover (frequently).
     currentRoverLat = gps_msg.latitude  # Current latitude
