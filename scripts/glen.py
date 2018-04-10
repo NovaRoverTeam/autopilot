@@ -240,8 +240,8 @@ def Calc_Route(req):
         long1MonashSelected = 145.134746 
         long2MonashSelected = 145.139853
 
-        pixelIncrementLat = 7.400532105327368 # hardcodedd values found by calling TestMapDimensionsInfo 
-        pixelIncrementLong = 7.400532105327368
+        pixelIncrementLat = -6.620725388603314e-05 # hardcodedd values found by calling TestMapDimensionsInfo 
+        pixelIncrementLong = 8.294084507037695e-05
         
         currentNodeLat, currentNodeLong, currentDistScalingFactorLat, currentDistScalingFactorLong = PrintRoute.FindNodeFromGPS(currentRoverLat, currentRoverLong, lat1MonashSelected, long1MonashSelected,lat2MonashSelected, long2MonashSelected, pixelIncrementLat, pixelIncrementLong)
         rospy.loginfo("Graph node found for from the rover's GPS coordinate ~ Glen")
