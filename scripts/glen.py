@@ -151,7 +151,7 @@ class PrintRoute: # ============================================================
     #end class PrintRoute ---------------------------------------------------------------------------------
     
 class ConvertDist2GPSCoord:# =================================================================================
-	global currentRoverLat
+    global currentRoverLat
     global currentRoverLong
 
     def DeltaGPSCoord(bearing):     
