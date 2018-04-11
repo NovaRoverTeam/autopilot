@@ -228,6 +228,7 @@ def Calc_Route(req):
         destRoverLat = req.destination.latitude # Do something with the Gps coordinate of destination 
         destRoverLong = req.destination.longitude
         rospy.loginfo("Longitude and latitude obtained from GPS node ~ Glen")
+        
 
         #print(req.destination) # testing
         #lat1Farm = -36.570556 #values used to select a smalller region in DEM file
@@ -239,31 +240,37 @@ def Calc_Route(req):
         lat2MonashSelected = -37.914679
         long1MonashSelected = 145.134746 
         long2MonashSelected = 145.139853
+        if(currentRoverLat < lat1MonashSelected and currentRoverLat>lat2MonashSelected ):
+            rospy.loginfo("Latitude out of map range ~ Glen")
+        if(currentRoverLong < long1MonashSelected and currentRoverLong>long2MonashSelected ):
+            rospy.loginfo("Longitude out of map range ~ Glen")
+        else:
+            pixelIncrementLat = -6.620725388603314e-05 # hardcodedd values found by calling TestMapDimensionsInfo 
+            pixelIncrementLong = 8.294084507037695e-05
+            rospy.loginfo("Current Rover Latitude: ",currentRoverLat)
+            rospy.loginfo("Current Rover Longitude: ",currentRoverLong)
+            
+            currentNodeLat, currentNodeLong, currentDistScalingFactorLat, currentDistScalingFactorLong = PrintRoute.FindNodeFromGPS(currentRoverLat, currentRoverLong, lat1MonashSelected, long1MonashSelected,lat2MonashSelected, long2MonashSelected, pixelIncrementLat, pixelIncrementLong)
+            rospy.loginfo("Graph node found for from the rover's GPS coordinate ~ Glen")
+            destNodeLat, destNodeLong, destDistScalingFactorLat, destDistScalingFactorLong = PrintRoute.FindNodeFromGPS(destRoverLat, destRoverLong, lat1MonashSelected, long1MonashSelected,lat2MonashSelected, long2MonashSelected, pixelIncrementLat, pixelIncrementLong)
+            rospy.loginfo("Longitude and latitude obtained from GPS node ~ Glen")
+            # find route through graph
+            gpsRoute = PrintRoute.CallRoute(monashGraph, currentNodeLat, currentNodeLong, destNodeLat, destNodeLong)
+            rospy.loginfo("Route called inbetween graph nodes ~ Glen")
+        # Initialise list of route coords, the type must be the ROS msg Gps
+        route = [] 
 
-        pixelIncrementLat = -6.620725388603314e-05 # hardcodedd values found by calling TestMapDimensionsInfo 
-        pixelIncrementLong = 8.294084507037695e-05
+        # *** GENERATE THE ROUTE HERE***
+
+        response = calc_routeResponse() # Create the service response message
         
-        currentNodeLat, currentNodeLong, currentDistScalingFactorLat, currentDistScalingFactorLong = PrintRoute.FindNodeFromGPS(currentRoverLat, currentRoverLong, lat1MonashSelected, long1MonashSelected,lat2MonashSelected, long2MonashSelected, pixelIncrementLat, pixelIncrementLong)
-        rospy.loginfo("Graph node found for from the rover's GPS coordinate ~ Glen")
-        destNodeLat, destNodeLong, destDistScalingFactorLat, destDistScalingFactorLong = PrintRoute.FindNodeFromGPS(destRoverLat, destRoverLong, lat1MonashSelected, long1MonashSelected,lat2MonashSelected, long2MonashSelected, pixelIncrementLat, pixelIncrementLong)
-        rospy.loginfo("Longitude and latitude obtained from GPS node ~ Glen")
-        # find route through graph
-        gpsRoute = PrintRoute.CallRoute(monashGraph, currentNodeLat, currentNodeLong, destNodeLat, destNodeLong)
-        rospy.loginfo("Route called inbetween graph nodes ~ Glen")
-    # Initialise list of route coords, the type must be the ROS msg Gps
-    route = [] 
+        for i in range(0,len(gpsRoute),2):
+            gps_coord = Gps() # Create an individual GPS coordinate
+            gps_coord.latitude = gpsRoute[i]  # Set latitude and longitude to whatever
+            gps_coord.longitude = gpsRoute[i+1]
+            route.append(gps_coord) # Append the coordinate to the route list 
 
-    # *** GENERATE THE ROUTE HERE***
-
-    response = calc_routeResponse() # Create the service response message
-    
-    for i in range(0,len(gpsRoute),2):
-        gps_coord = Gps() # Create an individual GPS coordinate
-        gps_coord.latitude = gpsRoute[i]  # Set latitude and longitude to whatever
-        gps_coord.longitude = gpsRoute[i+1]
-        route.append(gps_coord) # Append the coordinate to the route list 
-
-    response.route = route # Give route list to the service response
+        response.route = route # Give route list to the service response
     
     return response # Return the response to the service request - the route.
 
