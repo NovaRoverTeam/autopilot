@@ -285,7 +285,7 @@ def Grid_Size(req):
 
 
 def GPS_Callback(gps_msg):
-	global currentRoverLat
+    global currentRoverLat
     global currentRoverLong
 
     # This callback function runs whenever the GPS node publishes the 
