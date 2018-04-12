@@ -241,11 +241,8 @@ def Calc_Route(req):
         lat2MonashSelected = -37.914679
         long1MonashSelected = 145.134746 
         long2MonashSelected = 145.139853
-        if(currentRoverLat < lat1MonashSelected or currentRoverLat>lat2MonashSelected ):
-            rospy.loginfo("Latitude out of map range ~ Glen")
-        if(currentRoverLong < long1MonashSelected or currentRoverLong>long2MonashSelected ):
-            rospy.loginfo("Longitude out of map range ~ Glen")
-        else:
+      
+        if(currentRoverLat < lat1MonashSelected and currentRoverLat > lat2MonashSelected and currentRoverLong < long1MonashSelected and currentRoverLong>long2MonashSelected ):
             pixelIncrementLat = -6.620725388603314e-05 # hardcodedd values found by calling TestMapDimensionsInfo 
             pixelIncrementLong = 8.294084507037695e-05
             rospy.loginfo("Current Rover Latitude: %f",currentRoverLat)
@@ -272,8 +269,11 @@ def Calc_Route(req):
                 route.append(gps_coord) # Append the coordinate to the route list 
 
             response.route = route # Give route list to the service response
+        else:
+            rospy.loginfo("GPS coordinate out of map range ~ Glen")
+            response = 0
     
-    return response # Return the response to the service request - the route.
+        return response # Return the response to the service request - the route.
 
 def Grid_Size(req):
 
