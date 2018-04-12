@@ -228,7 +228,7 @@ def Calc_Route(req):
         # find the nodes which correspond the current and destination GPS coordinates
         destRoverLat = req.destination.latitude # Do something with the Gps coordinate of destination 
         destRoverLong = req.destination.longitude
-        rospy.loginfo("Longitude and latitude obtained from GPS node ~ Glen")
+        rospy.loginfo("Longitude and latitude destination obtained from GPS node ~ Glen")
         
 
         #print(req.destination) # testing
@@ -241,9 +241,9 @@ def Calc_Route(req):
         lat2MonashSelected = -37.914679
         long1MonashSelected = 145.134746 
         long2MonashSelected = 145.139853
-        if(currentRoverLat < lat1MonashSelected and currentRoverLat>lat2MonashSelected ):
+        if(currentRoverLat < lat1MonashSelected or currentRoverLat>lat2MonashSelected ):
             rospy.loginfo("Latitude out of map range ~ Glen")
-        if(currentRoverLong < long1MonashSelected and currentRoverLong>long2MonashSelected ):
+        if(currentRoverLong < long1MonashSelected or currentRoverLong>long2MonashSelected ):
             rospy.loginfo("Longitude out of map range ~ Glen")
         else:
             pixelIncrementLat = -6.620725388603314e-05 # hardcodedd values found by calling TestMapDimensionsInfo 
