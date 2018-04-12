@@ -27,7 +27,7 @@ mapLoadFlag = 0
 
 #Other functions*****************************************************************************************
 class MapDetails:# =================================================================================
-
+    @staticmethod 
     def Haversine(planetRadius, lat1, long1, lat2, long2):
         """Calculates the distance inbetween two GPS coordinates on a planet"""
 	dLat = radians(lat2 - lat1)
@@ -38,7 +38,7 @@ class MapDetails:# =============================================================
 	a = sin(dLat/2)**2 + cos(lat1)*cos(lat2)*sin(dLon/2)**2
 	c = 2*asin(sqrt(a))
 	return planetRadius * c
-
+    @staticmethod 
     def TestMapDimensionInfo(mapImg, planet, lat1, long1, lat2, long2): #not currently used because had coded below
         """Checks the dimesntions of a graph and returns the incremental change in the latitude/latitude"""
         if(planet == 1):#1=earth, 0=mars
@@ -128,7 +128,7 @@ class PrintRoute: # ============================================================
         #attempt to find the nearest route if GPS coordinate out of range- direct link in the required direciton then call a route
 
         return nodeNameX, nodeNameY,scalingFactorLat, scalingFactorLong  #returns the corresponding node
-
+    @staticmethod 
     def CallRoute(g, routeLat1, routeLong1, routeLat2, routeLong2):
         # call route through graph 
         # Route Lat and Long are currently node coordinates 
