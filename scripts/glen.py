@@ -105,11 +105,11 @@ class PrintRoute: # ============================================================
     def FindNodeFromGPS(nodeLat, nodeLong, latBoundaryTL, longBoundaryTL,latBoundaryBR, longBoundaryBR, nodeGPSIncrementLat, nodeGPSIncrementLong):
         """Finds the nearest node label from a GPS coordinate, given the graph/map GPS boundaries"""
         #check nodeLat and nodeLong are within the range of the graph 
-        if(nodeLat > latBoundaryTL or nodeLat < latBoundaryBR):
-            rospy.loginfo("The GPS latitude recieved is outside of the graph range")
+        #if(nodeLat > latBoundaryTL or nodeLat < latBoundaryBR):
+            #rospy.loginfo("The GPS latitude recieved is outside of the graph range")
             # set to the nearest value - take the most direct route to this node
-        if(nodeLong < longBoundaryTL or nodeLong > longBoundaryBR):
-            rospy.loginfo("The GPS longitude recived is outside of the graph range")
+        #if(nodeLong < longBoundaryTL or nodeLong > longBoundaryBR):
+            #rospy.loginfo("The GPS longitude recived is outside of the graph range")
             # set to the nearest value - take the most direct route to this node
             
         #print('node lat:',nodeLat)
@@ -281,6 +281,7 @@ def Calc_Route(req):
                 gps_coord.longitude = gpsRoute[i+1]
                 route.append(gps_coord) # Append the coordinate to the route list
                 rospy.loginfo("Route found~ Glen")
+                rospy.loginfo("Route: %f", gpsRoute)
 
             response.route = route # Give route list to the service response
         else:
