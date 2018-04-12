@@ -223,6 +223,7 @@ def Calc_Route(req):
     # Destination can be GPS or a distance + true bearing
     if(req.latlng == False): #HELPPP: how has ben flagged this????
         # convert distance to a GPS coordinate
+        rospy.loginfo("latlng flag set correctly~ Glen")
         destRoverLat, destRoverLong = ConvertDist2GPSCoord.DetermineDestGPSCoord(req.bearing, req.distance, currentRoverLat, currentRoverLong) 
         rospy.loginfo("Found destination from direction and baring ~ Glen")
         # set flag to FlagDestGPS to True
