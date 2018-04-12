@@ -178,8 +178,8 @@ class ConvertDist2GPSCoord:# ===================================================
             destinationLong = currentRoverLong + deltaLongitude
             # convert distance in meters to a longitude/latitude
             rospy.loginfo("Angle: 0-90 degrees!")
-            rospy.loginfo("Destination Latitude: %f.6",destinationLat)
-            rospy.loginfo("Destination Longitude: %f.6",destinationLong)
+            rospy.loginfo("Destination Latitude: %f",destinationLat)
+            rospy.loginfo("Destination Longitude: %f",destinationLong)
             
         elif(bearing <= 180 and bearing >90): # quadrant 4 
             modifiedAngle = bearing - 90
@@ -187,6 +187,8 @@ class ConvertDist2GPSCoord:# ===================================================
             destinationLat = currentRoverLat - deltaLatitude
             destinationLong = currentRoverLong + deltaLongitude
             rospy.loginfo("Angle: 90-180 degrees!")
+            rospy.loginfo("Destination Latitude: %f",destinationLat)
+            rospy.loginfo("Destination Longitude: %f",destinationLong)
             
         elif(bearing <= 270 and bearing>180): #quadrant 3 
             modifiedAngle = bearing - 180
@@ -194,6 +196,8 @@ class ConvertDist2GPSCoord:# ===================================================
             destinationLat = currentRoverLat - deltaLatitude
             destinationLong = currentRoverLong - deltaLongitude
             rospy.loginfo("Angle: 180-270")
+            rospy.loginfo("Destination Latitude: %f",destinationLat)
+            rospy.loginfo("Destination Longitude: %f",destinationLong)
             
         elif(bearing <360 and bearing >270): #quadent 2
             modifiedAngle = bearing - 270
@@ -201,6 +205,8 @@ class ConvertDist2GPSCoord:# ===================================================
             destinationLat = currentRoverLat + deltaLatitude
             destinationLong = currentRoverLong - deltaLongitude
             rospy.loginfo("Angle: 270-360")
+            rospy.loginfo("Destination Latitude: %f",destinationLat)
+            rospy.loginfo("Destination Longitude: %f",destinationLong)
             
         else:
             rospy.loginfo("ERROR: The compass input out of range and must be inbetween 0-360 degrees!")
