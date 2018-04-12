@@ -257,7 +257,7 @@ def Calc_Route(req):
 
         response = calc_routeResponse() # Create the service response message
         
-        if(currentRoverLat < lat1MonashSelected and currentRoverLat > lat2MonashSelected and currentRoverLong < long1MonashSelected and currentRoverLong>long2MonashSelected ):
+        if(currentRoverLat > lat1MonashSelected and currentRoverLat < lat2MonashSelected and currentRoverLong > long1MonashSelected and currentRoverLong < long2MonashSelected ):
             pixelIncrementLat = -6.620725388603314e-05 # hardcodedd values found by calling TestMapDimensionsInfo 
             pixelIncrementLong = 8.294084507037695e-05
             rospy.loginfo("Current Rover Latitude: %f",currentRoverLat)
