@@ -105,10 +105,10 @@ class PrintRoute: # ============================================================
     def FindNodeFromGPS(nodeLat, nodeLong, latBoundaryTL, longBoundaryTL,latBoundaryBR, longBoundaryBR, nodeGPSIncrementLat, nodeGPSIncrementLong):
         """Finds the nearest node label from a GPS coordinate, given the graph/map GPS boundaries"""
         #check nodeLat and nodeLong are within the range of the graph 
-        if(nodeLat < latBoundaryTL and nodeLat > latBoundaryBR):
-            rospy.loginfo("The GPS latitude recived is outside of the graph range")
+        if(nodeLat > latBoundaryTL or nodeLat < latBoundaryBR):
+            rospy.loginfo("The GPS latitude recieved is outside of the graph range")
             # set to the nearest value - take the most direct route to this node
-        if(nodeLat < longBoundaryTL and nodeLat > longBoundaryBR):
+        if(nodeLat < longBoundaryTL or nodeLat > longBoundaryBR):
             rospy.loginfo("The GPS longitude recived is outside of the graph range")
             # set to the nearest value - take the most direct route to this node
             
@@ -229,11 +229,11 @@ def Calc_Route(req):
         mapLoadFlag = 1
     
     # Destination can be GPS or a distance + true bearing
-    if(req.latlng == False): #HELPPP: how has ben flagged this????
+    if(req.latlng == False): 
         # convert distance to a GPS coordinate
         rospy.loginfo("latlng flag set correctly~ Glen")
         destRoverLat, destRoverLong = ConvertDist2GPSCoord.DetermineDestGPSCoord(req.bearing, req.distance, currentRoverLat, currentRoverLong) 
-        rospy.loginfo("Found destination from direction and baring ~ Glen")
+        rospy.loginfo("Found destination from direction and bearing ~ Glen")
         # set flag to FlagDestGPS to True
         req.latlng = True
         
@@ -286,6 +286,7 @@ def Calc_Route(req):
             rospy.loginfo("GPS coordinate out of map range ~ Glen")
             rospy.loginfo("Rover Longitude: %f \n Rover latitude: %f", currentRoverLat, currentRoverLong)
             response = False
+            rospy.loginfo("Route found~ Glen")
     
         return response # Return the response to the service request - the route.
 
