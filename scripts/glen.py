@@ -178,6 +178,8 @@ class ConvertDist2GPSCoord:# ===================================================
             destinationLong = currentRoverLong + deltaLongitude
             # convert distance in meters to a longitude/latitude
             rospy.loginfo("Angle: 0-90 degrees!")
+            rospy.loginfo("Destination Latitude: %f.6",destinationLat)
+            rospy.loginfo("Destination Longitude: %f.6",destinationLong)
             
         elif(bearing <= 180 and bearing >90): # quadrant 4 
             modifiedAngle = bearing - 90
