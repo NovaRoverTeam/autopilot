@@ -284,6 +284,7 @@ def Calc_Route(req):
             response.route = route # Give route list to the service response
         else:
             rospy.loginfo("GPS coordinate out of map range ~ Glen")
+            rospy.loginfo("Rover Longitude: %f /n Rover latitude: %f", currentRoverLat, currentRoverLong)
             response = False
     
         return response # Return the response to the service request - the route.
