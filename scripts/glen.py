@@ -154,7 +154,7 @@ class PrintRoute: # ============================================================
 class ConvertDist2GPSCoord:# =================================================================================
     global currentRoverLat
     global currentRoverLong
-
+    @staticmethod 
     def DeltaGPSCoord(bearing):     
         deltaLatitude = distance*cos(bearing)  # angle taken from the y axis 
         deltaLongitude = distance*sin(bearing)
@@ -165,7 +165,7 @@ class ConvertDist2GPSCoord:# ===================================================
         #print("detaLatitudeGPS:", detaLatitudeGPS)
         #print("detaLongitudeGPS:",detaLongitudeGPS)
         return deltaLatitudeGPS, deltaLongitudeGPS
-
+    @staticmethod 
     def DetermineDestGPSCoord(bearing, distance, currentRoverLat, currentRoverLong): 
         ##NOTE: Calc from distance to GPS coord pair changes depending on locaiton on earth. May need to alter approximation for 
         # Utah - https://en.wikipedia.org/wiki/Decimal_degrees 
@@ -176,25 +176,29 @@ class ConvertDist2GPSCoord:# ===================================================
             deltaLatitude, deltaLongitude = DeltaGPSCoord(bearing)
             destinationLat = currentRoverLat + deltaLatitude
             destinationLong = currentRoverLong + deltaLongitude
-            # convert distance in meters to a longitude/latitude 
+            # convert distance in meters to a longitude/latitude
+            rospy.loginfo("Angle: 0-90 degrees!")
             
         elif(bearing <= 180 and bearing >90): # quadrant 4 
             modifiedAngle = bearing - 90
             deltaLatitude, deltaLongitude = DeltaGPSCoord(bearing)
             destinationLat = currentRoverLat - deltaLatitude
             destinationLong = currentRoverLong + deltaLongitude
+            rospy.loginfo("Angle: 90-180 degrees!")
             
         elif(bearing <= 270 and bearing>180): #quadrant 3 
             modifiedAngle = bearing - 180
             deltaLatitude, deltaLongitude = DeltaGPSCoord(bearing)
             destinationLat = currentRoverLat - deltaLatitude
             destinationLong = currentRoverLong - deltaLongitude
+            rospy.loginfo("Angle: 180-270")
             
         elif(bearing <360 and bearing >270): #quadent 2
             modifiedAngle = bearing - 270
             deltaLatitude, deltaLongitude = DeltaGPSCoord(bearing)
             destinationLat = currentRoverLat + deltaLatitude
             destinationLong = currentRoverLong - deltaLongitude
+            rospy.loginfo("Angle: 270-360")
             
         else:
             rospy.loginfo("ERROR: The compass input out of range and must be inbetween 0-360 degrees!")
@@ -220,7 +224,7 @@ def Calc_Route(req):
     if(req.latlng == False): #HELPPP: how has ben flagged this????
         # convert distance to a GPS coordinate
         destRoverLat, destRoverLong = ConvertDist2GPSCoord.DetermineDestGPSCoord(req.bearing, req.distance, currentRoverLat, currentRoverLong) 
-        rospy.loginfo("Find destination from direction and baring ~ Glen")
+        rospy.loginfo("Found destination from direction and baring ~ Glen")
         # set flag to FlagDestGPS to True
         req.latlng = True
         
