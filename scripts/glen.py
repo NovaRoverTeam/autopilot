@@ -87,20 +87,21 @@ class MapDetails:# =============================================================
 #end class MapDetails -------------------------------------------------------------------------------------
 
 class PrintRoute: # ===========================================================================================
+    @staticmethod
     def PrintRouteGraph(g, routeLat1, routeLong1, routeLat2, routeLong2):
         """Printing route will be included with zoomable visualisation, for now unused sections have been removed/
         commented. Used to determine the route"""
         path=nx.shortest_path(g) # source,target not specified
         route = path[(routeLat1,routeLong1)][(routeLat2,routeLong2)]
         return route #, subgraphColours
-
+    @staticmethod
     def PrintGPSRoute(graph, desiredRoute): # Round GPS coordinates to 6 decimal places
         #print(nx.get_node_attributes(g, 'gpsCoordinate'))
         routeGPSCoord = []
         for i in range(len(desiredRoute)):
             routeGPSCoord.append(graph.nodes[desiredRoute[i]]['gpsCoordinate'])
         return routeGPSCoord
-
+    @staticmethod 
     def FindNodeFromGPS(nodeLat, nodeLong, latBoundaryTL, longBoundaryTL,latBoundaryBR, longBoundaryBR, nodeGPSIncrementLat, nodeGPSIncrementLong):
         """Finds the nearest node label from a GPS coordinate, given the graph/map GPS boundaries"""
         #check nodeLat and nodeLong are within the range of the graph 
