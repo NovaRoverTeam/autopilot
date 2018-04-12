@@ -241,7 +241,9 @@ def Calc_Route(req):
         lat2MonashSelected = -37.914679
         long1MonashSelected = 145.134746 
         long2MonashSelected = 145.139853
-      
+
+        response = calc_routeResponse() # Create the service response message
+        
         if(currentRoverLat < lat1MonashSelected and currentRoverLat > lat2MonashSelected and currentRoverLong < long1MonashSelected and currentRoverLong>long2MonashSelected ):
             pixelIncrementLat = -6.620725388603314e-05 # hardcodedd values found by calling TestMapDimensionsInfo 
             pixelIncrementLong = 8.294084507037695e-05
@@ -260,7 +262,7 @@ def Calc_Route(req):
 
             # *** GENERATE THE ROUTE HERE***
 
-            response = calc_routeResponse() # Create the service response message
+            
             
             for i in range(0,len(gpsRoute),2):
                 gps_coord = Gps() # Create an individual GPS coordinate
