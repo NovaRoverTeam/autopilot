@@ -257,7 +257,7 @@ def Calc_Route(req):
 
         response = calc_routeResponse() # Create the service response message
         
-        if(currentRoverLat > lat1MonashSelected and currentRoverLat < lat2MonashSelected and currentRoverLong > long1MonashSelected and currentRoverLong < long2MonashSelected ):
+        if(currentRoverLat < lat1MonashSelected and currentRoverLat > lat2MonashSelected and currentRoverLong > long1MonashSelected and currentRoverLong < long2MonashSelected ):
             pixelIncrementLat = -6.620725388603314e-05 # hardcodedd values found by calling TestMapDimensionsInfo 
             pixelIncrementLong = 8.294084507037695e-05
             rospy.loginfo("Current Rover Latitude: %f",currentRoverLat)
@@ -284,7 +284,7 @@ def Calc_Route(req):
             response.route = route # Give route list to the service response
         else:
             rospy.loginfo("GPS coordinate out of map range ~ Glen")
-            rospy.loginfo("Rover Longitude: %f /n Rover latitude: %f", currentRoverLat, currentRoverLong)
+            rospy.loginfo("Rover Longitude: %f \n Rover latitude: %f", currentRoverLat, currentRoverLong)
             response = False
     
         return response # Return the response to the service request - the route.
