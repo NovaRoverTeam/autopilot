@@ -302,11 +302,13 @@ def glen():
     # Subscribes to the GPS_data topic.
     rospy.Subscriber("/gps/gps_data", Gps, GPS_Callback)
 
-    # Sets up the Calc_Route service, to generate the GPS route.
-    serv = rospy.Service('Calc_Route', calc_route, Calc_Route)
-
     # Sets up the Grid_Size service, to find lat and long distance between grid units.
-    serv = rospy.Service('Grid_Size', grid_size, Grid_Size)
+    serv2 = rospy.Service('Grid_Size', grid_size, Grid_Size)
+
+    # Sets up the Calc_Route service, to generate the GPS route.
+    serv1 = rospy.Service('Calc_Route', calc_route, Calc_Route)
+
+    
 
     while not rospy.is_shutdown():      
       # TODO anything that needs to run continuously, put in here
