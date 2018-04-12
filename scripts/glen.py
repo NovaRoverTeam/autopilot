@@ -155,7 +155,7 @@ class ConvertDist2GPSCoord:# ===================================================
     global currentRoverLat
     global currentRoverLong
     @staticmethod 
-    def DeltaGPSCoord(bearing):     
+    def DeltaGPSCoord(bearing, distance):     
         deltaLatitude = distance*cos(bearing)  # angle taken from the y axis 
         deltaLongitude = distance*sin(bearing)
         #print("deltaLongitude:",deltaLongitude )
@@ -173,7 +173,7 @@ class ConvertDist2GPSCoord:# ===================================================
         distPerDegLong = (111320*cos(radians(currentRoverLat))) #m/degree
         
         if(bearing>=0 and bearing<=90): #quadreant 1 #NOTE: distance of conversion is in meters
-            deltaLatitude, deltaLongitude = ConvertDist2GPSCoord.DeltaGPSCoord(bearing)
+            deltaLatitude, deltaLongitude = ConvertDist2GPSCoord.DeltaGPSCoord(bearing, distance)
             destinationLat = currentRoverLat + deltaLatitude
             destinationLong = currentRoverLong + deltaLongitude
             # convert distance in meters to a longitude/latitude
@@ -181,7 +181,7 @@ class ConvertDist2GPSCoord:# ===================================================
             
         elif(bearing <= 180 and bearing >90): # quadrant 4 
             modifiedAngle = bearing - 90
-            deltaLatitude, deltaLongitude = ConvertDist2GPSCoord.DeltaGPSCoord(bearing)
+            deltaLatitude, deltaLongitude = ConvertDist2GPSCoord.DeltaGPSCoord(bearing, distance)
             destinationLat = currentRoverLat - deltaLatitude
             destinationLong = currentRoverLong + deltaLongitude
             rospy.loginfo("Angle: 90-180 degrees!")
