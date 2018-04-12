@@ -211,7 +211,7 @@ def Calc_Route(req):
 
     # load in map
     if(mapLoadFlag ==0):  
-        monashGraph = nx.read_gpickle("monashGraph.gpickle") #load in pre-processed graph, must be in same directory
+        monashGraph = nx.read_gpickle("/home/nova/catkin_ws/src/autopilot/scripts/monashGraph.gpickle") #load in pre-processed graph, must be in same directory
 	rospy.loginfo("Graph has been loaded ~ Glen")
         mapLoadFlag = 1
     
