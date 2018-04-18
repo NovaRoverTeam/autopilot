@@ -237,7 +237,7 @@ int main(int argc, char **argv)
   ros::Rate loop_rate(LOOP_HZ);	// Define loop rate
 
   ros::Subscriber bearing_sub = 
-    (*n).subscribe("/imu/bearing", 1, Bearing_cb);
+    (*n).subscribe("/bearing", 1, Bearing_cb);
 
   // TODO get lidar topic name
   ros::Subscriber LIDAR_sub = 
