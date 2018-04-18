@@ -1,5 +1,6 @@
 
 #include "ros/ros.h"
+#include "ros/console.h"
 #include <stdlib.h>
 #include <cmath>
 #include <math.h> 
@@ -88,7 +89,7 @@ float Angle_Between(latlng coord1, latlng coord2)
   float long2 = coord2.longitude;
 
   float X = cos(lat1)*sin(lat2) 
-              - sin(lat1)*cos(lat2)*cos(long2 - long1);
+            - sin(lat1)*cos(lat2)*cos(long2 - long1);
 
   float Y = cos(lat2)*sin(long2 - long1);
 
@@ -266,6 +267,19 @@ int main(int argc, char **argv)
   {
     string STATE; (*n).getParam("STATE", STATE);
     string AUTO_STATE; (*n).getParam("AUTO_STATE", AUTO_STATE);
+
+    latlng test_pos;
+    test_pos.latitude = -34;
+    test_pos.longitude = 144;
+
+    /*
+    ROS_INFO_STREAM("Have we arrived at lat: " << test_pos.latitude
+      << " long: " << test_pos.longitude << "? Answer: " 
+      << Arrived(rover_pos, test_pos));
+
+    ROS_INFO_STREAM("What is angle between lat: " << test_pos.latitude
+      << " long: " << test_pos.longitude << "? Answer: " 
+      << Angle_Between(rover_pos, test_pos)); */
 
     if (STATE == "AUTO")
     {
