@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   gps
+  rover
   sensor_msgs
 )
 
@@ -71,6 +72,7 @@ generate_messages(
   DEPENDENCIES 
   std_msgs
   gps
+  rover
 )
 
 ################################################
@@ -105,7 +107,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES GPS
-  CATKIN_DEPENDS message_runtime message_generation roscpp rospy std_msgs gps
+  CATKIN_DEPENDS message_runtime message_generation roscpp rospy std_msgs gps rover
 #  DEPENDS system_lib
 )
 
