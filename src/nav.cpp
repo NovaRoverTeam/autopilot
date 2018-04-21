@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <iostream>
+#include <algorithm>
 #include <ros/console.h>
 #include "point.h"
 
@@ -14,9 +15,10 @@ using namespace std;
 
 #define NUM_OF_SCAN_POINTS 683
 #define MIN_RHO 0.07
-#define SEPARATION 0.1
+#define SEPARATION 0.2
+#define VAR_THRES 0.01
 #define CORNER_ANGLE 1.0
-#define MIN_PTS 10
+#define MIN_PTS 5
 #define BOTTOM_BOUND -0.2
 #define UPPER_BOUND 3.2
 #define FLOORLINE_BOTTOM_BOUND 1.0
@@ -26,6 +28,7 @@ using namespace std;
 #define MIN_OBJECT_DISTANCE 0.2
 #define OBSTACLE_DISTANCE 1.0
 #define STOP 7
+#define WINDOW 1
 
 
 float angle_min, angle_increment;
@@ -46,91 +49,91 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan) {
 	dataReady = true;
 }
 
-vector< vector<Point> > filterRaw(const vector<Point>& pts){
-	bool last_corner;
+vector<Segment> cluster(const vector<Point>& pts){
 
 	vector<Point> temp;
-	vector< vector<Point> > groups;
-	vector< vector<Point> > filteredGroups;
+	vector<Point>::const_iterator it0 = pts.begin(), it1 = pts.begin()+1;
+	vector<Segment> clusters, clusters0;
 
-	for (int i = 0; i < pts.size(); i++){
+	while(it0 < pts.end() & it1 < pts.end()){
+		Point pt0 = *(it1 - 1), pt1 = *it1;
 
-		if (i > 7) {
-			Point pt0 = pts[i],
-				  pt1 = pts[i-1],
-				  pt2 = pts[i-2],
-				  pt3 = pts[i-3],
-				  pt4 = pts[i-4],
-				  pt5 = pts[i-5],
-				  pt6 = pts[i-6],
-				  pt7 = pts[i-7];
+		float a = pt1 - pt0;
 
-			float a = pt0 - pt1;
-			float b = pt1 - pt2;
+		bool close = a <= SEPARATION;
 
-			float c = pt0 / pt1;
-			float d = pt6 / pt7;
-
-			bool close = a <= SEPARATION & b <= SEPARATION;
-			bool corner = (abs(c - d) > CORNER_ANGLE) & !last_corner; 
-
-			if (!close | corner) {
-				groups.push_back(temp);
-				temp.clear();
-			}
-			last_corner = corner;
+		if (close){
+			it1++;
+		} else {
+			temp.assign(it0,it1);
+			clusters0.push_back(Segment(temp));
+			it0 = it1 + 1;
+			it1 = it0 + 1;
 		}
-		temp.push_back(pts[i]);
 	}
 
-	groups.push_back(temp);
-	temp.clear();
+	temp.assign(it0,it1);
+	clusters0.push_back(Segment(temp));
 
-	for (unsigned int i = 0; i < groups.size(); i++){
-		if (groups[i].size() > MIN_PTS) filteredGroups.push_back(groups[i]);
+	for (unsigned int i = 0; i < clusters0.size(); i++){
+		clusters.push_back(clusters0[i]);
 	}
 
-	return filteredGroups;
+	return clusters;
 }
 
+vector<Segment> split(const Segment cluster){
 
-vector<float> lineFit(const vector<Point>& segment){
-	vector<float> coeff;
+	const vector<Point> clusterPt = cluster.pts;
 
-	unsigned int n = segment.size();
-	float s_x = 0, s_y = 0, s_xx = 0, s_xy = 0, m = 0, avg_x = 0, avg_y = 0;
+	unsigned int i=0;
 
-	for (unsigned int i = 0; i < n; i++){
-		Point pt = segment[i];
-		s_x += pt.x();
-		s_y += pt.y();
-		s_xx += pt.x()*pt.x();
-		s_xy += pt.x()*pt.y();
-	}	
+	vector<Segment> segments;
+	vector<Point> firstPts, secondPts;
+	vector<Point>::const_iterator b = clusterPt.begin(), it = clusterPt.begin()+WINDOW, e = clusterPt.end();
+	float sumVar;
+	vector<float> vars;
 
-	avg_x = s_x / n;
-	avg_y = s_y / n;
-	coeff.push_back(avg_x);
-	coeff.push_back(avg_y);
+	while (it < (e - WINDOW)){
 
-	bool inBoundary = avg_x > BOTTOM_BOUND &
-					  avg_x < UPPER_BOUND &
-					  avg_y > -SIDE_BOUND_FROM_CENTER &
-					  avg_y < SIDE_BOUND_FROM_CENTER;
+		firstPts.assign(b,it);
+		secondPts.assign(it,e);
 
-	if (inBoundary){
-		m = (n * s_xy - s_x * s_y) / (n * s_xx - s_x * s_x);
-		coeff.push_back(m);
-		coeff.push_back(avg_y - m * avg_x);
+		Segment firstSeg = Segment(firstPts), secondSeg = Segment(secondPts);
 
-		Point last = segment.back();
-		Point first = segment.front();
-		coeff.push_back(last - first > MIN_LENGTH);
+		sumVar = firstSeg.var(true) + secondSeg.var(true);
+		if (!isnan(sumVar)){
+			vars.push_back(sumVar);
+		} else {
+			vars.push_back(1);
+		}
+		it++;
 	}
-    return coeff;
+
+	vector<float>::iterator result = min_element(vars.begin(), vars.end());
+
+	it = clusterPt.begin() + distance(vars.begin(), result) + 1;
+
+	firstPts.assign(b,it);
+	secondPts.assign(it,e);
+
+	Segment firstSeg = Segment(firstPts), secondSeg = Segment(secondPts);
+
+	segments.push_back(firstSeg);
+	segments.push_back(secondSeg);
+
+	return segments;
 }
 
+void recursiveSplit(Segment cluster, vector<Segment>* list){
+	if (cluster.var(true) <= VAR_THRES) list->push_back(cluster);
+	else {
+		vector<Segment> twoSegs = split(cluster);
 
+		recursiveSplit(twoSegs[0], list);
+		recursiveSplit(twoSegs[1], list);
+	}
+}
 
 int main(int argc, char **argv)
 {
@@ -146,17 +149,29 @@ int main(int argc, char **argv)
 
 			sensor_msgs::LaserScan processed;
 			std_msgs::Byte nav;
+			vector<Segment>::iterator it;
 
 			int smallObjectDetected = 0, largeObjectDetected = 0;
-			bool floorlineInRange = false;
 
 			//ROS_INFO("%u",pts.size());
-			vector<vector<Point> > groupsOfPts = filterRaw(pts);
-			vector<vector<float> > lineFitCoeffs;
-			vector<vector<float> > lines;
-			vector<vector<float> > possibleObjects;
-			vector<Point> objects;
+			vector<Segment> clusters = cluster(pts);
 
+			vector<Segment> listOfSegments0, listOfSegments;
+
+			for (it = clusters.begin() ; it != clusters.end(); ++it){
+				recursiveSplit(*it, &listOfSegments0);
+			}
+
+			for (it = listOfSegments0.begin() ; it != listOfSegments0.end(); ++it){
+				if (it->pts.size() > MIN_PTS) listOfSegments.push_back(*it);
+			}
+
+			for (it = listOfSegments.begin() ; it != listOfSegments.end(); ++it){
+				vector<float> xy = it->centerPt();
+				float major = it->var(false), length = it->length();
+				//ROS_INFO("%f", length/major);
+				//
+			}
 
 
 			ros::Time scan_time = ros::Time::now();
@@ -173,110 +188,24 @@ int main(int argc, char **argv)
 			processed.ranges.resize(NUM_OF_SCAN_POINTS);
     		processed.intensities.resize(NUM_OF_SCAN_POINTS);
 
-			for (unsigned int i = 0; i < groupsOfPts.size(); i++){
-				for (unsigned int j = 0; j < groupsOfPts[i].size(); j++){
-					Point point = groupsOfPts[i][j];
+			for (unsigned int i = 0; i < listOfSegments.size(); i++){
+				Segment seg = listOfSegments[i];
+				for (unsigned int j = 0; j < seg.pts.size(); j++){
+
+					Point point = seg.pts[j];
 
 					processed.ranges[point.num] = point.rho;
 					processed.intensities[point.num] = i;
 				}
-				lineFitCoeffs.push_back(lineFit(groupsOfPts[i]));				
-			}
-
-			for (unsigned int i = 0; i < lineFitCoeffs.size(); i++){
-				if (lineFitCoeffs[i].size() == 5){
-					if(lineFitCoeffs[i][4]){
-						lines.push_back(lineFitCoeffs[i]);
-						ROS_INFO("%f %f", lineFitCoeffs[i][2], lineFitCoeffs[i][3]);
-					} else possibleObjects.push_back(lineFitCoeffs[i]);
-				}
-			}
-
-			if (!lines.empty()){
-				for(unsigned int i = 0; i < lines.size(); i++){
-
-					float m = lines[i][2];
-					float c = lines[i][3];
-
-					float floorIntercept = -c / m;
-
-					if (floorIntercept < FLOORLINE_UPPER_BOUND & floorIntercept > FLOORLINE_BOTTOM_BOUND){
-						floorlineInRange = true;
-						
-					}
-
-					float deter = OBSTACLE_DISTANCE*OBSTACLE_DISTANCE*(m*m + 1.0) - c*c;
-
-					if (deter > 0){
-						float y1 = (c + abs(m)*sqrt(deter))/(m*m + 1.0);
-						float y2 = (c - abs(m)*sqrt(deter))/(m*m + 1.0);
-
-						bool a = (y1 < OBSTACLE_DISTANCE & y1 > OBSTACLE_DISTANCE/2);
-						bool b = (y2 > -OBSTACLE_DISTANCE & y2 < -OBSTACLE_DISTANCE/2);
-
-						largeObjectDetected |= 
-
-						(a | (y2 < OBSTACLE_DISTANCE & y2 > OBSTACLE_DISTANCE/2) ) << 2 |
-
-						((y1 > -OBSTACLE_DISTANCE/2 & y1 < OBSTACLE_DISTANCE/2) | (y2 > -OBSTACLE_DISTANCE/2 & y2 < OBSTACLE_DISTANCE/2) | (a&b)) << 1 |
-
-						((y1 > -OBSTACLE_DISTANCE & y1 < -OBSTACLE_DISTANCE/2) | b);
-					}
-				}
-
-				if (!floorlineInRange) {
-					nav.data = STOP;
-					ROS_WARN("FLOORLINE NOT IN RANGE");
-				}
-
-
-				for (unsigned int i = 0; i < possibleObjects.size(); i++){
-					float x = possibleObjects[i][0];
-					float y = possibleObjects[i][1];
-					bool separate = true;
-					for (unsigned int j = 0; j < lines.size(); j++){
-						float m = lines[j][2];
-						float c = lines[j][3];
-
-						//Point to line distance
-						bool onALine = abs(m*x - y + c)/sqrt(m*m + 1.0) < MIN_OBJECT_DISTANCE;
-						if (onALine) {
-							separate = false;
-							break;
-						}
-					}
-					if (separate){
-						ROS_INFO("object at %f %f", x, y);
-						objects.push_back(Point(x, y));					
-					} 
-				}
-			} else {
-				ROS_WARN("LIDAR IS NOT FACING ON THE FLOOR");
-				nav.data = STOP;
-			}
-
-			ROS_INFO("---");
-
-			for (unsigned int i = 0; i < objects.size(); i++){
-				smallObjectDetected |= 
-
-				(objects[i].theta > M_PI/6 &
-				 objects[i].theta < M_PI_2 &
-				 objects[i].rho < OBSTACLE_DISTANCE) << 2 |
-
-				(objects[i].theta > -M_PI/6 &
-				 objects[i].theta < M_PI/6 &
-				 objects[i].rho < OBSTACLE_DISTANCE) << 1 |
-
-				(objects[i].theta > -M_PI_2 &
-				 objects[i].theta < -M_PI/6 &
-				 objects[i].rho < OBSTACLE_DISTANCE);
 			}
 
 
-			nav.data |= largeObjectDetected | smallObjectDetected;
-			
+			//ROS_INFO("%u", listOfSegments.size());
+
+
+			nav.data |= STOP;
 			navPub.publish(nav);
+
 			processPub.publish(processed);
 
 			pts.clear();

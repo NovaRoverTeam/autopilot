@@ -1,3 +1,7 @@
+#include <vector>
+using namespace std;
+
+
 class Point
 {
 	public:
@@ -8,6 +12,14 @@ class Point
 	float x();
 	float y();
 	float operator-(const Point& rhs);
-	float operator/(const Point& rhs);
 };
 
+class Segment
+{
+	public:
+	Segment(const vector<Point>& PTS);
+	vector<Point> pts;
+	vector<float> centerPt();
+	float var(bool min);
+	float length();
+};

@@ -61,5 +61,9 @@
   <run_depend>sensor_msgs</run_depend>
 
 
+  <export>
+    <cpp cflags="-I${prefix}/srv/cpp"/>
+  </export>
+
 
 </package>
