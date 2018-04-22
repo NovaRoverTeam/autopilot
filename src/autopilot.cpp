@@ -13,6 +13,7 @@
 #include <rover/DriveCmd.h>
 
 #define LOOP_HZ 10
+#define MSG_PERIOD 5 // Period in seconds of message printing
 
 using namespace std;
 
@@ -44,6 +45,9 @@ float LIDAR_TURN; // How much to turn by when LIDAR says there's object
 float MAX_ANGLE; // How much to turn by when LIDAR says there's object
 float MAX_SPD; // What percentage of max speed to do in auto mode?
 
+int msg_cnt; // Counter for message printing
+
+bool disable_lidar; // ROS parameter
 
 //--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--
 // Setup:
@@ -58,11 +62,20 @@ void Setup()
   MAX_ANGLE = 90;
   MAX_SPD = 0.3; // 30% max speed
 
-  autopilot::grid_size srv; // Create service message
-  bool success = grid_client.call(srv);
+  msg_cnt = 0;
 
-  if (success) ROS_INFO("-- Successfully retrieved grid sizes."); 
-  else ROS_INFO("-- Failed to retrieve grid sizes."); 
+  autopilot::grid_size srv; // Create service message
+  bool success = false;  
+
+  while (!success)
+  {    
+    success = grid_client.call(srv);
+
+    if (success) ROS_INFO("\n-- Successfully retrieved grid sizes."); 
+    else ROS_INFO("\n-- Failed to retrieve grid sizes. Retrying..."); 
+
+    ros::Duration(2).sleep(); 
+  }
 
   lat_size = srv.response.lat_size; // Store the grid unit sizes
   long_size = srv.response.long_size;
@@ -108,7 +121,7 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
                 autopilot::calc_route::Response &res)
 {   
     // Possible states are STANDBY, TRAVERSE, AVOID, SEARCH
-  (*n).setParam("AUTO_STATE", "STANDBY"); // Auto starts in STANDBY
+  n->setParam("AUTO_STATE", "STANDBY"); // Auto starts in STANDBY
 
   autopilot::calc_route srv; // Create service message
 
@@ -124,11 +137,23 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     srv.request.bearing = req.bearing;
     srv.request.distance = req.distance;
   }
+
+  ros::WallTime start_, end_; // Measure Glen execution time
   
-  // Call the service Calc_Route, 
+  // Call the service Calc_Route, measuring time
+  start_ = ros::WallTime::now();
   bool success = auto_client.call(srv);
-  if (success) ROS_INFO("-- Successfully retrieved waypoint route."); 
-  else ROS_INFO("-- Failed to retrieve waypoint route."); 
+  end_ = ros::WallTime::now();
+
+  if (success)
+  {
+    ROS_INFO("\n-- Successfully retrieved waypoint route."); 
+
+    double exe_time = (end_ - start_).toSec();
+    ROS_INFO_STREAM("Glen execution time (s): " << exe_time << ".");
+  }
+  else 
+    ROS_INFO("\n-- Failed to retrieve waypoint route."); 
 
   vector<gps::Gps> gps_route = srv.response.route;
   n_wps = route.size();
@@ -145,7 +170,7 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     route.push_back(ll_coord);
   }
 
-  (*n).setParam("AUTO_STATE", "TRAVERSE"); // Start moving along route
+  n->setParam("AUTO_STATE", "TRAVERSE"); // Start moving along route
 
   // Return the success of the service call to glen.py
   return success;
@@ -168,7 +193,7 @@ void Bearing_cb(const std_msgs::Float32::ConstPtr& msg)
 //--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--
 void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)  
 {   
-  string AUTO_STATE; (*n).getParam("AUTO_STATE", AUTO_STATE);
+  string AUTO_STATE; n->getParam("AUTO_STATE", AUTO_STATE);
 
   if (AUTO_STATE != "STANDBY") // If we aren't being told to stop
   {
@@ -179,7 +204,7 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
 
     if (bit1) // Only if there's something in the middle third, dodge
     {
-      (*n).setParam("AUTO_STATE", "AVOID"); // Start LIDAR avoidance state
+      n->setParam("AUTO_STATE", "AVOID"); // Start LIDAR avoidance state
     
       // If something LEFT, turn RIGHT
       if (bit2 && !bit0) lidar_angle = LIDAR_TURN;
@@ -194,7 +219,7 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
           lidar_angle = -LIDAR_TURN;
       }
     }
-    else (*n).setParam("AUTO_STATE", "TRAVERSE"); // Start LIDAR avoidance state
+    else n->setParam("AUTO_STATE", "TRAVERSE"); // Start LIDAR avoidance state
   }
 }
 
@@ -237,49 +262,59 @@ int main(int argc, char **argv)
   ros::Rate loop_rate(LOOP_HZ);	// Define loop rate
 
   ros::Subscriber bearing_sub = 
-    (*n).subscribe("/bearing", 1, Bearing_cb);
+    n->subscribe("/bearing", 1, Bearing_cb);
 
-  // TODO get lidar topic name
-  ros::Subscriber LIDAR_sub = 
-    (*n).subscribe("/shortRangeNav", 1, LIDAR_cb);
+  n->getParam("disable_lidar", disable_lidar);
+
+  if (!disable_lidar)
+  {
+    ros::Subscriber LIDAR_sub = 
+      n->subscribe("/shortRangeNav", 1, LIDAR_cb);
+  }
 
   ros::Subscriber gps_sub = 
-    (*n).subscribe("/gps/gps_data", 1, GPS_cb);
+    n->subscribe("/gps/gps_data", 1, GPS_cb);
 
   ros::Publisher drive_pub = 
-    (*n).advertise<rover::DriveCmd>("cmd_data", 1);
+    n->advertise<rover::DriveCmd>("cmd_data", 1);
 
   ros::ServiceServer start_auto_srv = 
-    (*n).advertiseService("Start_Auto", Start_Auto);
+    n->advertiseService("Start_Auto", Start_Auto);
 
   auto_client = 
-    (*n).serviceClient<autopilot::calc_route>("/Calc_Route");
+    n->serviceClient<autopilot::calc_route>("/Calc_Route");
 
   grid_client = 
-    (*n).serviceClient<autopilot::grid_size>("/Grid_Size");
+    n->serviceClient<autopilot::grid_size>("/Grid_Size");
+
+  // Possible states are STANDBY, TRAVERSE, AVOID, SEARCH
+  n->setParam("AUTO_STATE", "STANDBY"); // Auto starts in STANDBY
 
   Setup(); // Initialise vars and get grid sizes
 
-  // Possible states are STANDBY, TRAVERSE, AVOID, SEARCH
-  (*n).setParam("AUTO_STATE", "STANDBY"); // Auto starts in STANDBY
+  ROS_INFO_STREAM("Route has " << n_wps << " waypoints.");
  
   while (ros::ok())
   {
-    string STATE; (*n).getParam("STATE", STATE);
-    string AUTO_STATE; (*n).getParam("AUTO_STATE", AUTO_STATE);
+    string STATE; n->getParam("STATE", STATE);
+    string AUTO_STATE; n->getParam("AUTO_STATE", AUTO_STATE);
 
-    latlng test_pos;
-    test_pos.latitude = -34;
-    test_pos.longitude = 144;
+    if (msg_cnt > LOOP_HZ*MSG_PERIOD)
+    {
+      ROS_INFO_STREAM("\nHeading towards wp #" << des_wp << ",");
+      ROS_INFO_STREAM("  at  latitude  " << route[des_wp].latitude  << ",");
+      ROS_INFO_STREAM("  and longitude " << route[des_wp].longitude << ".");
 
-    /*
-    ROS_INFO_STREAM("Have we arrived at lat: " << test_pos.latitude
-      << " long: " << test_pos.longitude << "? Answer: " 
-      << Arrived(rover_pos, test_pos));
+      ROS_INFO_STREAM("\nRelative angle to destination is " 
+                      << Angle_Between(rover_pos, route[des_wp]));
 
-    ROS_INFO_STREAM("What is angle between lat: " << test_pos.latitude
-      << " long: " << test_pos.longitude << "? Answer: " 
-      << Angle_Between(rover_pos, test_pos)); */
+      ROS_INFO_STREAM("\nDelta pos is lat  "  
+                      << route[des_wp].latitude - rover_pos.latitude << ",");
+      ROS_INFO_STREAM("             long " 
+                      << route[des_wp].latitude - rover_pos.latitude << ".");
+
+      msg_cnt = 0;
+    }
 
     if (STATE == "AUTO")
     {
@@ -299,11 +334,15 @@ int main(int argc, char **argv)
         // If arrived at wp, set next wp as destination or start ball search
         if (Arrived(rover_pos, route[des_wp])) 
         {
+          ROS_INFO_STREAM("\nArrived at wp #" << des_wp << "!");
+
           des_wp++; // Select next waypoint on route as new destination
    
           if (des_wp >= n_wps) // If we have arrived at the final waypoint
           {
-            (*n).setParam("AUTO_STATE", "SEARCH"); // Begin search for ball
+            ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
+
+            n->setParam("AUTO_STATE", "SEARCH"); // Begin search for ball
           }
         }
 
@@ -319,6 +358,8 @@ int main(int argc, char **argv)
         drive_pub.publish(msg);         
       }       
     }
+
+    msg_cnt++;
 
     ros::spinOnce();
     loop_rate.sleep();
