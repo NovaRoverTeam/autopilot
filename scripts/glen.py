@@ -250,9 +250,9 @@ def Calc_Route(req):
         #long2Farm = 146.629722 
         #long1Farm = 146.600278
     
-        lat1MonashSelected = -37.910108 # GPS coordianates for Monash ovals
+        lat1MonashSelected = -37.907172 # GPS coordianates for Monash ovals
         lat2MonashSelected = -37.914679
-        long1MonashSelected = 145.134746 
+        long1MonashSelected = 145.129395 
         long2MonashSelected = 145.139853
 
         response = calc_routeResponse() # Create the service response message
