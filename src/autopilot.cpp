@@ -123,6 +123,8 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     // Possible states are STANDBY, TRAVERSE, AVOID, SEARCH
   n->setParam("AUTO_STATE", "STANDBY"); // Auto starts in STANDBY
 
+  ROS_INFO_STREAM("\nAttempting to start autopilot sequence.");
+
   autopilot::calc_route srv; // Create service message
 
   // Forward the request to the Calc_Route service
