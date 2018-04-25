@@ -301,7 +301,7 @@ int main(int argc, char **argv)
     string STATE; n->getParam("STATE", STATE);
     string AUTO_STATE; n->getParam("AUTO_STATE", AUTO_STATE);
 
-    if (msg_cnt > LOOP_HZ*MSG_PERIOD)
+    if ((msg_cnt > LOOP_HZ*MSG_PERIOD) && route.size() > 0)
     {
       ROS_INFO_STREAM("\nHeading towards wp #" << des_wp << ",");
       ROS_INFO_STREAM("  at  latitude  " << route[des_wp].latitude  << ",");
