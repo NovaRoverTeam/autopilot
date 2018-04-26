@@ -6,7 +6,7 @@
 #include <math.h> 
 
 #include <gps/Gps.h>
-#include <std_msgs/Float32.h>
+#include <std_msgs/Int32.h>
 #include <std_msgs/Byte.h>
 #include <autopilot/calc_route.h>
 #include <autopilot/grid_size.h>
@@ -33,7 +33,7 @@ vector<latlng> route; // Route to be followed by autopilot
 int des_wp; // Index of next waypoint to be approached
 int n_wps; // Number of waypoints on the route
 
-float bearing; // Current rover bearing
+int bearing; // Current rover bearing
 latlng rover_pos; // Current GPS lat/long of the rover
 float lidar_angle; // Which way to go, according to LIDAR, relative
 
@@ -183,7 +183,7 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
 // Bearing_cb:
 //    Callback for subscription to rover bearing, gets rover angle.
 //--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--
-void Bearing_cb(const std_msgs::Float32::ConstPtr& msg)  
+void Bearing_cb(const std_msgs::Int32::ConstPtr& msg)  
 {   
   bearing = msg->data; // Set global bearing
 }
