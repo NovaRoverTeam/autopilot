@@ -20,6 +20,9 @@ import numpy as np
 import networkx as nx
 from math import radians, sin, cos, sqrt, asin, degrees, atan, floor
 
+import sys
+import resource
+
 # Global variables 
 currentRoverLat = 0
 currentRoverLong = 0
@@ -334,6 +337,22 @@ def glen():
       rate.sleep() # Sleep to maintain the loop rate
 
 
+def memory_limit():
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    resource.setrlimit(resource.RLIMIT_AS, (get_memory() * 1024 / 2, hard))
+
+
+def get_memory():
+    with open('/proc/meminfo', 'r') as mem:
+        free_memory = 0
+        for i in mem:
+            sline = i.split()
+            if str(sline[0]) in ('MemFree:', 'Buffers:', 'Cached:'):
+                free_memory += int(sline[1])
+    return free_memory
+
+
 if __name__ == '__main__':
+    memory_limit() # Limits maximum memory usage to half
     glen()
 
