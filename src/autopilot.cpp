@@ -121,7 +121,7 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
                 autopilot::calc_route::Response &res)
 {   
     // Possible states are STANDBY, TRAVERSE, AVOID, SEARCH
-  n->setParam("AUTO_STATE", "STANDBY"); // Auto starts in STANDBY
+  n->setParam("/AUTO_STATE", "STANDBY"); // Auto starts in STANDBY
 
   ROS_INFO_STREAM("\nAttempting to start autopilot sequence.");
 
@@ -172,7 +172,7 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     route.push_back(ll_coord);
   }
 
-  n->setParam("AUTO_STATE", "TRAVERSE"); // Start moving along route
+  n->setParam("/AUTO_STATE", "TRAVERSE"); // Start moving along route
 
   // Return the success of the service call to glen.py
   return success;
@@ -195,7 +195,7 @@ void Bearing_cb(const std_msgs::Int32::ConstPtr& msg)
 //--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--
 void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)  
 {   
-  string AUTO_STATE; n->getParam("AUTO_STATE", AUTO_STATE);
+  string AUTO_STATE; n->getParam("/AUTO_STATE", AUTO_STATE);
 
   if (AUTO_STATE != "STANDBY") // If we aren't being told to stop
   {
@@ -206,7 +206,7 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
 
     if (bit1) // Only if there's something in the middle third, dodge
     {
-      n->setParam("AUTO_STATE", "AVOID"); // Start LIDAR avoidance state
+      n->setParam("/AUTO_STATE", "AVOID"); // Start LIDAR avoidance state
     
       // If something LEFT, turn RIGHT
       if (bit2 && !bit0) lidar_angle = LIDAR_TURN;
@@ -221,7 +221,7 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
           lidar_angle = -LIDAR_TURN;
       }
     }
-    else n->setParam("AUTO_STATE", "TRAVERSE"); // Start LIDAR avoidance state
+    else n->setParam("/AUTO_STATE", "TRAVERSE"); // Start LIDAR avoidance state
   }
 }
 
@@ -259,7 +259,7 @@ bool Arrived(latlng coord1, latlng coord2)
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "autopilot"); // Initialise ROS package
-  n = new ros::NodeHandle();
+  n = new ros::NodeHandle("/");
 
   ros::Rate loop_rate(LOOP_HZ);	// Define loop rate
 
@@ -290,7 +290,7 @@ int main(int argc, char **argv)
     n->serviceClient<autopilot::grid_size>("/Grid_Size");
 
   // Possible states are STANDBY, TRAVERSE, AVOID, SEARCH
-  n->setParam("AUTO_STATE", "STANDBY"); // Auto starts in STANDBY
+  n->setParam("/AUTO_STATE", "STANDBY"); // Auto starts in STANDBY
 
   Setup(); // Initialise vars and get grid sizes
 
@@ -298,8 +298,8 @@ int main(int argc, char **argv)
  
   while (ros::ok())
   {
-    string STATE; n->getParam("STATE", STATE);
-    string AUTO_STATE; n->getParam("AUTO_STATE", AUTO_STATE);
+    string STATE; n->getParam("/STATE", STATE);
+    string AUTO_STATE; n->getParam("/AUTO_STATE", AUTO_STATE);
 
     if ((msg_cnt > LOOP_HZ*MSG_PERIOD) && route.size() > 0)
     {
@@ -344,7 +344,7 @@ int main(int argc, char **argv)
           {
             ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
 
-            n->setParam("AUTO_STATE", "SEARCH"); // Begin search for ball
+            n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
           }
         }
 
