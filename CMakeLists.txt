@@ -58,6 +58,7 @@ find_package(catkin REQUIRED COMPONENTS
    FILES
    calc_route.srv
    grid_size.srv
+   set_dest.srv
  )
 
 ## Generate actions in the 'action' folder

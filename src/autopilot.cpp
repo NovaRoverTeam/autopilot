@@ -10,7 +10,9 @@
 #include <std_msgs/Byte.h>
 #include <autopilot/calc_route.h>
 #include <autopilot/grid_size.h>
+#include <autopilot/set_dest.h>
 #include <rover/DriveCmd.h>
+#include <rover/Retrieve.h>
 
 #define LOOP_HZ 10
 #define MSG_PERIOD 5 // Period in seconds of message printing
@@ -37,6 +39,7 @@ int bearing; // Current rover bearing
 latlng rover_pos; // Current GPS lat/long of the rover
 float lidar_angle; // Which way to go, according to LIDAR, relative
 
+float grid_size; // Distance in metres of grid units
 float lat_size; // Grid unit sizes in latitude/longitude format
 float long_size;
 
@@ -49,6 +52,8 @@ int msg_cnt; // Counter for message printing
 
 bool disable_lidar; // ROS parameter
 
+latlng retrieval_dest; // Retrieval destination
+
 //--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--
 // Setup:
 //    General setup function for initialising variables.
@@ -57,7 +62,7 @@ void Setup()
 {
   des_wp = 0; // Start at the first waypoint
 
-  WP_THRES = 0.3; // Proportion of grid lat/long size req for wp arrival
+  WP_THRES = 5; // Distance in metres that counts as a wp being reached
   LIDAR_TURN = 45; // Try to turn 90 deg
   MAX_ANGLE = 90;
   MAX_SPD = 0.3; // 30% max speed
@@ -77,6 +82,7 @@ void Setup()
     ros::Duration(2).sleep(); 
   }
 
+  grid_size = srv.response.grid_size;
   lat_size = srv.response.lat_size; // Store the grid unit sizes
   long_size = srv.response.long_size;
 }
@@ -180,6 +186,22 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
 
 
 //--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--
+// Set_Dest:
+//    Set the destination for the interface to display.
+//--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--
+bool Set_Dest(autopilot::set_dest::Request  &req,
+              autopilot::set_dest::Response &res)
+{   
+  ROS_INFO_STREAM("\nAttempting to begin destination publishing.");
+
+  retrieval_dest.latitude = req.destination.latitude;
+  retrieval_dest.longitude = req.destination.longitude;
+
+  return true;
+}
+
+
+//--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--
 // Bearing_cb:
 //    Callback for subscription to rover bearing, gets rover angle.
 //--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--
@@ -241,13 +263,18 @@ void GPS_cb(const gps::Gps::ConstPtr& msg)
 // Arrived:
 //    Check if we have arrived at the destination location.
 //--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--
-bool Arrived(latlng coord1, latlng coord2)
+bool Arrived(latlng coord1, latlng coord2, float dist)
 {
   float delta_long = coord2.longitude - coord1.longitude;
   float delta_lat  = coord2.latitude  -  coord1.latitude;
 
-  return (delta_long < long_size*WP_THRES) 
-          && (delta_lat < lat_size*WP_THRES);
+  // Calculate distance in metres to destination
+  float distance = grid_size*sqrt(pow(delta_long/long_size, 2) 
+                                  + pow(delta_lat/lat_size, 2));
+
+  dist = distance; // Set distance
+
+  return distance < WP_THRES;
 }
 
 
@@ -280,8 +307,14 @@ int main(int argc, char **argv)
   ros::Publisher drive_pub = 
     n->advertise<rover::DriveCmd>("cmd_data", 1);
 
+  ros::Publisher dest_pub = 
+    n->advertise<rover::Retrieve>("retrieve", 1);
+
   ros::ServiceServer start_auto_srv = 
     n->advertiseService("Start_Auto", Start_Auto);
+
+  ros::ServiceServer set_dest_srv = 
+    n->advertiseService("Set_Dest", Set_Dest);
 
   auto_client = 
     n->serviceClient<autopilot::calc_route>("/Calc_Route");
@@ -334,7 +367,7 @@ int main(int argc, char **argv)
       else if (AUTO_STATE == "TRAVERSE")
       {
         // If arrived at wp, set next wp as destination or start ball search
-        if (Arrived(rover_pos, route[des_wp])) 
+        if (Arrived(rover_pos, route[des_wp], *(new float))) 
         {
           ROS_INFO_STREAM("\nArrived at wp #" << des_wp << "!");
 
@@ -359,6 +392,17 @@ int main(int argc, char **argv)
 
         drive_pub.publish(msg);         
       }       
+    }
+    else if (STATE == "RETRIEVE")
+    {
+      rover::Retrieve msg;
+      msg.bearing = Angle_Between(rover_pos, retrieval_dest);
+      
+      float dist;
+      Arrived(rover_pos, retrieval_dest, dist);
+      msg.distance = dist;
+
+      dest_pub.publish(msg);
     }
 
     msg_cnt++;

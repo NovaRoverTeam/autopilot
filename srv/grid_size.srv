@@ -4,5 +4,6 @@
 
 # Service response
 
-float32 lat_size
-float32 long_size
+float32 grid_size # Distance between grid units (metres)
+float32 lat_size  # Quantity between lat lines  (deg)
+float32 long_size # Quantity between long lines (deg)
