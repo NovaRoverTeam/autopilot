@@ -52,6 +52,7 @@ int msg_cnt; // Counter for message printing
 
 bool disable_lidar; // ROS parameter
 bool glen_enabled = 0;
+bool glen_enabled = 1;
 
 latlng retrieval_dest; // Retrieval destination
 
@@ -171,7 +172,16 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
 
     if (success)
     {
-      ROS_INFO("\n-- Successfully retrieved waypoint route."); 
+      ROS_INFO("\n-- Successfully retrieved waypoint route.");
+
+      double exe_time = (end_ - start_).toSec();
+      ROS_INFO_STREAM("Glen execution time (s): " << exe_time << ".");
+    }
+    else 
+      ROS_INFO("\n-- Failed to retrieve waypoint route."); 
+
+    vector<gps::Gps> gps_route = srv.response.route;
+    n_wps = route.size();
 
       double exe_time = (end_ - start_).toSec();
       ROS_INFO_STREAM("Glen execution time (s): " << exe_time << ".");
@@ -214,6 +224,31 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     }
 
     n_wps = route.size();
+
+      latlng ll_coord;
+      ll_coord.latitude = gps_coord.latitude;
+      ll_coord.longitude = gps_coord.longitude;
+
+      route.push_back(ll_coord);
+    }
+  }
+  else
+  {
+    latlng coord1;
+    coord1.latitude   = rover_pos.latitude;
+    coord1.longitude  = rover_pos.longitude;
+    latlng coord2;
+    coord2.latitude   = req.destination.latitude;
+    coord2.longitude  = req.destination.longitude;
+    for (int j=20; j<=100; j=j+20)
+    {
+      latlng ll_coord;
+      ll_coord.latitude = coord1.latitude + (coord2.latitude - coord1.latitude) * (j/100);
+      ll_coord.longitude = coord1.longitude + (coord2.longitude - coord2.longitude) * (j/100);
+      route.push_back(ll_coord);
+
+      success = 1;
+    }
   }
 
   n->setParam("/AUTO_STATE", "TRAVERSE"); // Start moving along route
