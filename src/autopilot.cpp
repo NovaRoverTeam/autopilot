@@ -27,8 +27,8 @@ typedef unsigned char byte;
 
 struct latlng // GPS coordinate format
 {
-  float latitude;
-  float longitude;
+  double latitude;
+  double longitude;
 };
 
 vector<latlng> route; // Route to be followed by autopilot
@@ -37,20 +37,21 @@ int n_wps; // Number of waypoints on the route
 
 int bearing; // Current rover bearing
 latlng rover_pos; // Current GPS lat/long of the rover
-float lidar_angle; // Which way to go, according to LIDAR, relative
+double lidar_angle; // Which way to go, according to LIDAR, relative
 
-float grid_size; // Distance in metres of grid units
-float lat_size; // Grid unit sizes in latitude/longitude format
-float long_size;
+double grid_size; // Distance in metres of grid units
+double lat_size; // Grid unit sizes in latitude/longitude format
+double long_size;
 
-float WP_THRES; // How close to wps until they're classed as reached
-float LIDAR_TURN; // How much to turn by when LIDAR says there's object
-float MAX_ANGLE; // How much to turn by when LIDAR says there's object
-float MAX_SPD; // What percentage of max speed to do in auto mode?
+double WP_THRES; // How close to wps until they're classed as reached
+double LIDAR_TURN; // How much to turn by when LIDAR says there's object
+double MAX_ANGLE; // How much to turn by when LIDAR says there's object
+double MAX_SPD; // What percentage of max speed to do in auto mode?
 
 int msg_cnt; // Counter for message printing
 
 bool disable_lidar; // ROS parameter
+bool glen_enabled = 0;
 
 latlng retrieval_dest; // Retrieval destination
 
@@ -82,13 +83,14 @@ void Setup()
     ros::Duration(2).sleep(); 
   }
 
-  grid_size = srv.response.grid_size;
+  //grid_size = srv.response.grid_size;
+  grid_size = 10;
   lat_size = srv.response.lat_size; // Store the grid unit sizes
   long_size = srv.response.long_size;
 }
 
 
-float fclamp(float value, float max, float min)
+double fclamp(double value, double max, double min)
 {
   if (value > max) return max;
   else if (value < min) return min;
@@ -96,23 +98,34 @@ float fclamp(float value, float max, float min)
 }
 
 
+
+
+
 //--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--
 // Angle_Between:
 //    Work out bearing between two GPS coordinates, deg clk from North.
 //--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--
-float Angle_Between(latlng coord1, latlng coord2)
+double Angle_Between(latlng coord1, latlng coord2)
 {
-  float lat1 = coord1.latitude; // convenient redefinitions
-  float long1 = coord1.longitude;
-  float lat2 = coord2.latitude;
-  float long2 = coord2.longitude;
+  double lat1 = M_PI*coord1.latitude/180; // convenient redefinitions
+  double long1 = M_PI*coord1.longitude/180;
+  double lat2 = M_PI*coord2.latitude/180;
+  double long2 = M_PI*coord2.longitude/180;
 
-  float X = cos(lat1)*sin(lat2) 
+  ROS_INFO_STREAM("lat1 " << lat1);
+  ROS_INFO_STREAM("lat2 " << lat2);
+  ROS_INFO_STREAM("long1 " << long1);
+  ROS_INFO_STREAM("long2 " << long2);
+
+  double X = cos(lat1)*sin(lat2) 
             - sin(lat1)*cos(lat2)*cos(long2 - long1);
 
-  float Y = cos(lat2)*sin(long2 - long1);
+  double Y = cos(lat2)*sin(long2 - long1);
 
-  float beta = atan2(Y, X);
+  ROS_INFO_STREAM("X " << X);
+  ROS_INFO_STREAM("Y " << Y);
+
+  double beta = 180*atan2(Y, X)/M_PI;
 
   if (beta > 0) return beta; // Return pos clkwise deg from North
   else return 360 + beta;  
@@ -128,6 +141,7 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
 {   
     // Possible states are STANDBY, TRAVERSE, AVOID, SEARCH
   n->setParam("/AUTO_STATE", "STANDBY"); // Auto starts in STANDBY
+  bool success;
 
   ROS_INFO_STREAM("\nAttempting to start autopilot sequence.");
 
@@ -149,33 +163,57 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
   ros::WallTime start_, end_; // Measure Glen execution time
   
   // Call the service Calc_Route, measuring time
-  start_ = ros::WallTime::now();
-  bool success = auto_client.call(srv);
-  end_ = ros::WallTime::now();
-
-  if (success)
+  if(glen_enabled)
   {
-    ROS_INFO("\n-- Successfully retrieved waypoint route."); 
+    start_ = ros::WallTime::now();
+    success = auto_client.call(srv);
+    end_ = ros::WallTime::now();
 
-    double exe_time = (end_ - start_).toSec();
-    ROS_INFO_STREAM("Glen execution time (s): " << exe_time << ".");
+    if (success)
+    {
+      ROS_INFO("\n-- Successfully retrieved waypoint route."); 
+
+      double exe_time = (end_ - start_).toSec();
+      ROS_INFO_STREAM("Glen execution time (s): " << exe_time << ".");
+    }
+    else 
+      ROS_INFO("\n-- Failed to retrieve waypoint route."); 
+
+    vector<gps::Gps> gps_route = srv.response.route;
+    n_wps = route.size();
+
+    // Populate the latlng route list from the Gps route list
+    for (int i=0; i<n_wps; i++)
+    {
+      gps::Gps gps_coord = gps_route[i];
+
+      latlng ll_coord;
+      ll_coord.latitude = gps_coord.latitude;
+      ll_coord.longitude = gps_coord.longitude;
+
+      route.push_back(ll_coord);
+    }
   }
-  else 
-    ROS_INFO("\n-- Failed to retrieve waypoint route."); 
-
-  vector<gps::Gps> gps_route = srv.response.route;
-  n_wps = route.size();
-
-  // Populate the latlng route list from the Gps route list
-  for (int i=0; i<n_wps; i++)
+  else
   {
-    gps::Gps gps_coord = gps_route[i];
+    latlng coord1;
+    coord1.latitude   = rover_pos.latitude;
+    coord1.longitude  = rover_pos.longitude;
+    latlng coord2;
+    coord2.latitude   = req.destination.latitude;
+    coord2.longitude  = req.destination.longitude;
+    for (int j=20; j<=100; j=j+20)
+    {
+      ROS_INFO_STREAM("ye");
+      latlng ll_coord;
+      ll_coord.latitude = coord1.latitude + (coord2.latitude - coord1.latitude) * (j/100);
+      ll_coord.longitude = coord1.longitude + (coord2.longitude - coord2.longitude) * (j/100);
+      route.push_back(ll_coord);
 
-    latlng ll_coord;
-    ll_coord.latitude = gps_coord.latitude;
-    ll_coord.longitude = gps_coord.longitude;
+      success = 1;
+    }
 
-    route.push_back(ll_coord);
+    n_wps = route.size();
   }
 
   n->setParam("/AUTO_STATE", "TRAVERSE"); // Start moving along route
@@ -263,14 +301,19 @@ void GPS_cb(const gps::Gps::ConstPtr& msg)
 // Arrived:
 //    Check if we have arrived at the destination location.
 //--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--
-bool Arrived(latlng coord1, latlng coord2, float dist)
+bool Arrived(latlng coord1, latlng coord2, double dist)
 {
-  float delta_long = coord2.longitude - coord1.longitude;
-  float delta_lat  = coord2.latitude  -  coord1.latitude;
+  double delta_long = coord2.longitude - coord1.longitude;
+  double delta_lat  = coord2.latitude  -  coord1.latitude;
+
+  //ROS_INFO_STREAM("delta long " << delta_long);
 
   // Calculate distance in metres to destination
-  float distance = grid_size*sqrt(pow(delta_long/long_size, 2) 
+  double distance = grid_size*sqrt(pow(delta_long/long_size, 2) 
                                   + pow(delta_lat/lat_size, 2));
+
+  //ROS_INFO_STREAM("grid_size " << grid_size);
+  //ROS_INFO_STREAM("distance " << distance);
 
   dist = distance; // Set distance
 
@@ -336,14 +379,14 @@ int main(int argc, char **argv)
 
     if ((msg_cnt > LOOP_HZ*MSG_PERIOD) && route.size() > 0)
     {
-      ROS_INFO_STREAM("\nHeading towards wp #" << des_wp << ",");
+      ROS_INFO_STREAM("Heading towards wp #" << des_wp << ",");
       ROS_INFO_STREAM("  at  latitude  " << route[des_wp].latitude  << ",");
       ROS_INFO_STREAM("  and longitude " << route[des_wp].longitude << ".");
 
-      ROS_INFO_STREAM("\nRelative angle to destination is " 
+      ROS_INFO_STREAM("Relative angle to destination is " 
                       << Angle_Between(rover_pos, route[des_wp]));
 
-      ROS_INFO_STREAM("\nDelta pos is lat  "  
+      ROS_INFO_STREAM("Delta pos is lat  "  
                       << route[des_wp].latitude - rover_pos.latitude << ",");
       ROS_INFO_STREAM("             long " 
                       << route[des_wp].latitude - rover_pos.latitude << ".");
@@ -367,7 +410,7 @@ int main(int argc, char **argv)
       else if (AUTO_STATE == "TRAVERSE")
       {
         // If arrived at wp, set next wp as destination or start ball search
-        if (Arrived(rover_pos, route[des_wp], *(new float))) 
+        if (Arrived(rover_pos, route[des_wp], *(new double))) 
         {
           ROS_INFO_STREAM("\nArrived at wp #" << des_wp << "!");
 
@@ -382,7 +425,7 @@ int main(int argc, char **argv)
         }
 
         // Find angle we need to turn to get on course
-        float des_angle = Angle_Between(rover_pos, route[des_wp]) - bearing;
+        double des_angle = Angle_Between(rover_pos, route[des_wp]) - bearing;
       
         // Create ROS msg for drive command
         rover::DriveCmd msg;
@@ -398,7 +441,7 @@ int main(int argc, char **argv)
       rover::Retrieve msg;
       msg.bearing = Angle_Between(rover_pos, retrieval_dest);
       
-      float dist;
+      double dist;
       Arrived(rover_pos, retrieval_dest, dist);
       msg.distance = dist;
 
