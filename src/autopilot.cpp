@@ -38,6 +38,7 @@ int n_wps; // Number of waypoints on the route
 int bearing; // Current rover bearing
 latlng rover_pos; // Current GPS lat/long of the rover
 double lidar_angle; // Which way to go, according to LIDAR, relative
+bool lidar_reverse; // True if we need to back up
 
 double grid_size; // Distance in metres of grid units
 double lat_size; // Grid unit sizes in latitude/longitude format
@@ -52,7 +53,6 @@ int msg_cnt; // Counter for message printing
 
 bool disable_lidar; // ROS parameter
 bool glen_enabled = 0;
-bool glen_enabled = 1;
 
 latlng retrieval_dest; // Retrieval destination
 
@@ -64,7 +64,7 @@ void Setup()
 {
   des_wp = 0; // Start at the first waypoint
 
-  WP_THRES = 5; // Distance in metres that counts as a wp being reached
+  WP_THRES = 10; // Distance in metres that counts as a wp being reached
   LIDAR_TURN = 45; // Try to turn 90 deg
   MAX_ANGLE = 90;
   MAX_SPD = 0.3; // 30% max speed
@@ -113,18 +113,10 @@ double Angle_Between(latlng coord1, latlng coord2)
   double lat2 = M_PI*coord2.latitude/180;
   double long2 = M_PI*coord2.longitude/180;
 
-  ROS_INFO_STREAM("lat1 " << lat1);
-  ROS_INFO_STREAM("lat2 " << lat2);
-  ROS_INFO_STREAM("long1 " << long1);
-  ROS_INFO_STREAM("long2 " << long2);
-
   double X = cos(lat1)*sin(lat2) 
             - sin(lat1)*cos(lat2)*cos(long2 - long1);
 
   double Y = cos(lat2)*sin(long2 - long1);
-
-  ROS_INFO_STREAM("X " << X);
-  ROS_INFO_STREAM("Y " << Y);
 
   double beta = 180*atan2(Y, X)/M_PI;
 
@@ -183,15 +175,6 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     vector<gps::Gps> gps_route = srv.response.route;
     n_wps = route.size();
 
-      double exe_time = (end_ - start_).toSec();
-      ROS_INFO_STREAM("Glen execution time (s): " << exe_time << ".");
-    }
-    else 
-      ROS_INFO("\n-- Failed to retrieve waypoint route."); 
-
-    vector<gps::Gps> gps_route = srv.response.route;
-    n_wps = route.size();
-
     // Populate the latlng route list from the Gps route list
     for (int i=0; i<n_wps; i++)
     {
@@ -214,42 +197,18 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     coord2.longitude  = req.destination.longitude;
     for (int j=20; j<=100; j=j+20)
     {
-      ROS_INFO_STREAM("ye");
       latlng ll_coord;
-      ll_coord.latitude = coord1.latitude + (coord2.latitude - coord1.latitude) * (j/100);
-      ll_coord.longitude = coord1.longitude + (coord2.longitude - coord2.longitude) * (j/100);
+      ll_coord.latitude = coord1.latitude + (coord2.latitude - coord1.latitude) * (((float) j)/100);
+      ll_coord.longitude = coord1.longitude + (coord2.longitude - coord1.longitude) * (((float) j)/100);
       route.push_back(ll_coord);
 
       success = 1;
     }
 
     n_wps = route.size();
-
-      latlng ll_coord;
-      ll_coord.latitude = gps_coord.latitude;
-      ll_coord.longitude = gps_coord.longitude;
-
-      route.push_back(ll_coord);
-    }
   }
-  else
-  {
-    latlng coord1;
-    coord1.latitude   = rover_pos.latitude;
-    coord1.longitude  = rover_pos.longitude;
-    latlng coord2;
-    coord2.latitude   = req.destination.latitude;
-    coord2.longitude  = req.destination.longitude;
-    for (int j=20; j<=100; j=j+20)
-    {
-      latlng ll_coord;
-      ll_coord.latitude = coord1.latitude + (coord2.latitude - coord1.latitude) * (j/100);
-      ll_coord.longitude = coord1.longitude + (coord2.longitude - coord2.longitude) * (j/100);
-      route.push_back(ll_coord);
 
-      success = 1;
-    }
-  }
+  ROS_INFO_STREAM("Route has " << n_wps << " waypoints.");
 
   n->setParam("/AUTO_STATE", "TRAVERSE"); // Start moving along route
 
@@ -295,14 +254,17 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
   if (AUTO_STATE != "STANDBY") // If we aren't being told to stop
   {
     byte raw = msg->data;
+    bool bit3 = raw & 0b10001000; // Do we need to reverse? 2-filter
     bool bit2 = raw & 0b00000100; // Left third
     bool bit1 = raw & 0b00000010; // Middle third
     bool bit0 = raw & 0b00000001; // Right third
-
+    
     if (bit1) // Only if there's something in the middle third, dodge
     {
       n->setParam("/AUTO_STATE", "AVOID"); // Start LIDAR avoidance state
-    
+      
+      lidar_reverse = bit3; // Do we back up or nah?
+  
       // If something LEFT, turn RIGHT
       if (bit2 && !bit0) lidar_angle = LIDAR_TURN;
       // If something RIGHT, turn LEFT
@@ -336,21 +298,16 @@ void GPS_cb(const gps::Gps::ConstPtr& msg)
 // Arrived:
 //    Check if we have arrived at the destination location.
 //--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--
-bool Arrived(latlng coord1, latlng coord2, double dist)
+bool Arrived(latlng coord1, latlng coord2, double *dist)
 {
   double delta_long = coord2.longitude - coord1.longitude;
   double delta_lat  = coord2.latitude  -  coord1.latitude;
-
-  //ROS_INFO_STREAM("delta long " << delta_long);
 
   // Calculate distance in metres to destination
   double distance = grid_size*sqrt(pow(delta_long/long_size, 2) 
                                   + pow(delta_lat/lat_size, 2));
 
-  //ROS_INFO_STREAM("grid_size " << grid_size);
-  //ROS_INFO_STREAM("distance " << distance);
-
-  dist = distance; // Set distance
+  *(dist) = distance; // Set distance
 
   return distance < WP_THRES;
 }
@@ -372,6 +329,8 @@ int main(int argc, char **argv)
     n->subscribe("/bearing", 1, Bearing_cb);
 
   n->getParam("disable_lidar", disable_lidar);
+
+  ROS_INFO_STREAM("disable_lidar " << disable_lidar);
 
   if (!disable_lidar)
   {
@@ -405,26 +364,28 @@ int main(int argc, char **argv)
 
   Setup(); // Initialise vars and get grid sizes
 
-  ROS_INFO_STREAM("Route has " << n_wps << " waypoints.");
- 
   while (ros::ok())
   {
     string STATE; n->getParam("/STATE", STATE);
     string AUTO_STATE; n->getParam("/AUTO_STATE", AUTO_STATE);
+    double proximity; // Distance to wp, for debugging 
 
     if ((msg_cnt > LOOP_HZ*MSG_PERIOD) && route.size() > 0)
     {
-      ROS_INFO_STREAM("Heading towards wp #" << des_wp << ",");
-      ROS_INFO_STREAM("  at  latitude  " << route[des_wp].latitude  << ",");
-      ROS_INFO_STREAM("  and longitude " << route[des_wp].longitude << ".");
+      ROS_INFO_STREAM("AUTO_STATE is " << AUTO_STATE);
+      ROS_INFO_STREAM("\nHeading towards wp #" << des_wp 
+        << ",\n  at  latitude  " << route[des_wp].latitude
+        << ",\n  and longitude " << route[des_wp].longitude << ".");
 
-      ROS_INFO_STREAM("Relative angle to destination is " 
-                      << Angle_Between(rover_pos, route[des_wp]));
+      ROS_INFO_STREAM("\nRelative angle to destination is " 
+                      << Angle_Between(rover_pos, route[des_wp]) - bearing
+                      << "\nProximity is " << proximity << " metres.");
 
-      ROS_INFO_STREAM("Delta pos is lat  "  
-                      << route[des_wp].latitude - rover_pos.latitude << ",");
-      ROS_INFO_STREAM("             long " 
-                      << route[des_wp].latitude - rover_pos.latitude << ".");
+      ROS_INFO_STREAM("\nDelta pos is lat  "  
+                      << route[des_wp].latitude - rover_pos.latitude
+                      << ",\n             long " 
+                      << route[des_wp].latitude - rover_pos.latitude 
+                      << ".");
 
       msg_cnt = 0;
     }
@@ -438,14 +399,14 @@ int main(int argc, char **argv)
 
         // Turn and/or drive
         msg.steer = fclamp(100*lidar_angle/MAX_ANGLE, 100.0, -100.0);
-        msg.acc = copysign(100 - fabs(msg.steer), msg.steer);
+        msg.acc = 100 - fabs(msg.steer);
 
         drive_pub.publish(msg); 
       }
       else if (AUTO_STATE == "TRAVERSE")
-      {
+      {        
         // If arrived at wp, set next wp as destination or start ball search
-        if (Arrived(rover_pos, route[des_wp], *(new double))) 
+        if (Arrived(rover_pos, route[des_wp], &proximity)) 
         {
           ROS_INFO_STREAM("\nArrived at wp #" << des_wp << "!");
 
@@ -465,8 +426,9 @@ int main(int argc, char **argv)
         // Create ROS msg for drive command
         rover::DriveCmd msg;
 
+        
         msg.steer = fclamp(100*des_angle/MAX_ANGLE, 100.0, -100.0);
-        msg.acc = copysign(100 - fabs(msg.steer), msg.steer);
+        msg.acc = 100 - fabs(msg.steer);
 
         drive_pub.publish(msg);         
       }       
@@ -477,7 +439,7 @@ int main(int argc, char **argv)
       msg.bearing = Angle_Between(rover_pos, retrieval_dest);
       
       double dist;
-      Arrived(rover_pos, retrieval_dest, dist);
+      Arrived(rover_pos, retrieval_dest, &dist);
       msg.distance = dist;
 
       dest_pub.publish(msg);
