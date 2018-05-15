@@ -51,7 +51,7 @@ double MAX_SPD; // What percentage of max speed to do in auto mode?
 
 int msg_cnt; // Counter for message printing
 
-bool disable_lidar; // ROS parameter
+bool disable_lidar = 0; // ROS parameter
 bool glen_enabled = 0;
 
 latlng retrieval_dest; // Retrieval destination
@@ -64,8 +64,10 @@ void Setup()
 {
   des_wp = 0; // Start at the first waypoint
 
+  disable_lidar; // Enable the LIDAR
+
   WP_THRES = 10; // Distance in metres that counts as a wp being reached
-  LIDAR_TURN = 45; // Try to turn 90 deg
+  LIDAR_TURN = 90; // Try to turn 90 deg
   MAX_ANGLE = 90;
   MAX_SPD = 0.3; // 30% max speed
 
@@ -249,36 +251,38 @@ void Bearing_cb(const std_msgs::Int32::ConstPtr& msg)
 //--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--
 void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)  
 {   
-  string AUTO_STATE; n->getParam("/AUTO_STATE", AUTO_STATE);
+  string STATE; n->getParam("/STATE", STATE);
 
-  if (AUTO_STATE != "STANDBY") // If we aren't being told to stop
+  if (STATE != "STANDBY") // If we aren't being told to stop
   {
     byte raw = msg->data;
     bool bit3 = raw & 0b10001000; // Do we need to reverse? 2-filter
-    bool bit2 = raw & 0b00000100; // Left third
-    bool bit1 = raw & 0b00000010; // Middle third
-    bool bit0 = raw & 0b00000001; // Right third
-    
+    bool bit2 = raw & 0b01000100; // Left third
+    bool bit1 = raw & 0b00100010; // Middle third
+    bool bit0 = raw & 0b00010001; // Right third
+
+    if (raw != 0) n->setParam("/AUTO_STATE", "AVOID");
+    else n->setParam("/AUTO_STATE", "TRAVERSE");
+  
+    lidar_reverse = bit3;
+    if (bit3)
+    {
+	if (bit2) lidar_angle = LIDAR_TURN;
+	if (bit0) lidar_angle = -LIDAR_TURN;
+    }
     if (bit1) // Only if there's something in the middle third, dodge
     {
-      n->setParam("/AUTO_STATE", "AVOID"); // Start LIDAR avoidance state
-      
-      lidar_reverse = bit3; // Do we back up or nah?
-  
       // If something LEFT, turn RIGHT
       if (bit2 && !bit0) lidar_angle = LIDAR_TURN;
       // If something RIGHT, turn LEFT
       else if (bit0 && !bit2) lidar_angle = -LIDAR_TURN;
       // If both left and right are occupied
-      else 
+      else
       { // Turn in direction closest to next waypoint
-        if (Angle_Between(rover_pos, route[des_wp]) - bearing > 0)
-          lidar_angle = LIDAR_TURN;
-        else
-          lidar_angle = -LIDAR_TURN;
+     	if (Angle_Between(rover_pos, route[des_wp]) - bearing > 0) lidar_angle = LIDAR_TURN;
+		  else lidar_angle = -LIDAR_TURN;
       }
     }
-    else n->setParam("/AUTO_STATE", "TRAVERSE"); // Start LIDAR avoidance state
   }
 }
 
@@ -321,22 +325,19 @@ bool Arrived(latlng coord1, latlng coord2, double *dist)
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "autopilot"); // Initialise ROS package
-  n = new ros::NodeHandle("/");
+  n = new ros::NodeHandle();
 
   ros::Rate loop_rate(LOOP_HZ);	// Define loop rate
-
+  
   ros::Subscriber bearing_sub = 
     n->subscribe("/bearing", 1, Bearing_cb);
 
-  n->getParam("disable_lidar", disable_lidar);
-
-  ROS_INFO_STREAM("disable_lidar " << disable_lidar);
-
-  if (!disable_lidar)
-  {
-    ros::Subscriber LIDAR_sub = 
-      n->subscribe("/shortRangeNav", 1, LIDAR_cb);
-  }
+  //n->getParam("disable_lidar", disable_lidar);
+  //ROS_INFO_STREAM("disable_lidar " << disable_lidar);
+   
+  //if (!disable_lidar)
+  ros::Subscriber LIDAR_sub = 
+    n->subscribe("/shortRangeNav", 1, LIDAR_cb);
 
   ros::Subscriber gps_sub = 
     n->subscribe("/gps/gps_data", 1, GPS_cb);
@@ -348,10 +349,10 @@ int main(int argc, char **argv)
     n->advertise<rover::Retrieve>("retrieve", 1);
 
   ros::ServiceServer start_auto_srv = 
-    n->advertiseService("Start_Auto", Start_Auto);
+    n->advertiseService("/Start_Auto", Start_Auto);
 
   ros::ServiceServer set_dest_srv = 
-    n->advertiseService("Set_Dest", Set_Dest);
+    n->advertiseService("/Set_Dest", Set_Dest);
 
   auto_client = 
     n->serviceClient<autopilot::calc_route>("/Calc_Route");
@@ -393,13 +394,14 @@ int main(int argc, char **argv)
     if (STATE == "AUTO")
     {
       if (AUTO_STATE == "AVOID") // LIDAR takes priority
-      { 
+      {
         // Create ROS msg for drive command
         rover::DriveCmd msg;
 
         // Turn and/or drive
         msg.steer = fclamp(100*lidar_angle/MAX_ANGLE, 100.0, -100.0);
-        msg.acc = 100 - fabs(msg.steer);
+        if (lidar_reverse) msg.acc = 0.5*(100 - fabs(msg.steer));
+        else               msg.acc = 100 - fabs(msg.steer);
 
         drive_pub.publish(msg); 
       }

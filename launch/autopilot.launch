@@ -1,11 +1,5 @@
 <launch>
 
-  <arg name="disable_lidar" />
-
-  <node name="autopilot" pkg="autopilot" type="autopilot" output="screen">
-
-    <param name="disable_lidar" value="$(arg disable_lidar)"/>
-
-  </node>
+  <node name="autopilot" pkg="autopilot" type="autopilot" output="screen"/>
 
 </launch>
