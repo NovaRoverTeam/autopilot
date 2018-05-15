@@ -256,22 +256,13 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
   if (STATE != "STANDBY") // If we aren't being told to stop
   {
     byte raw = msg->data;
-    bool bit3 = raw & 0b10001000; // Do we need to reverse? 2-filter
+    bool bit3 = raw & 0b10001000; // Do we need to reverse?
     bool bit2 = raw & 0b01000100; // Left third
     bool bit1 = raw & 0b00100010; // Middle third
     bool bit0 = raw & 0b00010001; // Right third
 
-    if (raw != 0) n->setParam("/AUTO_STATE", "AVOID");
-    else n->setParam("/AUTO_STATE", "TRAVERSE");
-  
-    lidar_reverse = bit3;
-    if (bit3)
-    {
-	if (bit2) lidar_angle = LIDAR_TURN;
-	if (bit0) lidar_angle = -LIDAR_TURN;
-    }
-    if (bit1) // Only if there's something in the middle third, dodge
-    {
+    if (bit3) {
+      n->setParam("/AUTO_STATE", "AVOID");
       // If something LEFT, turn RIGHT
       if (bit2 && !bit0) lidar_angle = LIDAR_TURN;
       // If something RIGHT, turn LEFT
@@ -279,10 +270,19 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
       // If both left and right are occupied
       else
       { // Turn in direction closest to next waypoint
-     	if (Angle_Between(rover_pos, route[des_wp]) - bearing > 0) lidar_angle = LIDAR_TURN;
-		  else lidar_angle = -LIDAR_TURN;
+      if (Angle_Between(rover_pos, route[des_wp]) - bearing > 0) lidar_angle = LIDAR_TURN;
+      else lidar_angle = -LIDAR_TURN;
       }
     }
+    else if (STATE == "AVOID"){
+      n->setParam("/AUTO_STATE", "JUST_AVOIDED");
+    }
+    else if (STATE == "JUST_AVOIDED"){
+      if (raw == 0){
+        n->setParam("/AUTO_STATE", "TRAVERSE");
+      }
+    }
+    else n->setParam("/AUTO_STATE", "TRAVERSE");
   }
 }
 
@@ -393,46 +393,57 @@ int main(int argc, char **argv)
 
     if (STATE == "AUTO")
     {
-      if (AUTO_STATE == "AVOID") // LIDAR takes priority
-      {
-        // Create ROS msg for drive command
-        rover::DriveCmd msg;
+		if (AUTO_STATE == "AVOID") // LIDAR takes priority
+		{
+		  // Create ROS msg for drive command
+		  rover::DriveCmd msg;
 
-        // Turn and/or drive
-        msg.steer = fclamp(100*lidar_angle/MAX_ANGLE, 100.0, -100.0);
-        if (lidar_reverse) msg.acc = 0.5*(100 - fabs(msg.steer));
-        else               msg.acc = 100 - fabs(msg.steer);
+		  // Turn and/or drive
+		  msg.steer = fclamp(100*lidar_angle/MAX_ANGLE, 100.0, -100.0);
+		  msg.acc = 0;
 
-        drive_pub.publish(msg); 
-      }
-      else if (AUTO_STATE == "TRAVERSE")
-      {        
-        // If arrived at wp, set next wp as destination or start ball search
-        if (Arrived(rover_pos, route[des_wp], &proximity)) 
-        {
-          ROS_INFO_STREAM("\nArrived at wp #" << des_wp << "!");
+		  drive_pub.publish(msg); 
+		}
+		else if (AUTO_STATE == "JUST_AVOIDED")
+		{
+		    // Create ROS msg for drive command
+		  rover::DriveCmd msg;
 
-          des_wp++; // Select next waypoint on route as new destination
-   
-          if (des_wp >= n_wps) // If we have arrived at the final waypoint
-          {
-            ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
+		  // Turn and/or drive
+		  msg.steer = 0;
+		  msg.acc = 100;
 
-            n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
-          }
-        }
+		  drive_pub.publish(msg); 
+		}
+		else if (AUTO_STATE == "TRAVERSE")
+		{        
+		  // If arrived at wp, set next wp as destination or start ball search
+		  if (Arrived(rover_pos, route[des_wp], &proximity)) 
+		  {
+		    ROS_INFO_STREAM("\nArrived at wp #" << des_wp << "!");
 
-        // Find angle we need to turn to get on course
-        double des_angle = Angle_Between(rover_pos, route[des_wp]) - bearing;
-      
-        // Create ROS msg for drive command
-        rover::DriveCmd msg;
+		    des_wp++; // Select next waypoint on route as new destination
 
-        
-        msg.steer = fclamp(100*des_angle/MAX_ANGLE, 100.0, -100.0);
-        msg.acc = 100 - fabs(msg.steer);
+		    if (des_wp >= n_wps) // If we have arrived at the final waypoint
+		    {
+		      ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
 
-        drive_pub.publish(msg);         
+		      n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
+		    }
+		  }
+
+		  // Find angle we need to turn to get on course
+		  double des_angle = Angle_Between(rover_pos, route[des_wp]) - bearing;
+
+		  // Create ROS msg for drive command
+		  rover::DriveCmd msg;
+
+		  
+		  msg.steer = fclamp(100*des_angle/MAX_ANGLE, 100.0, -100.0);
+		  msg.acc = 100 - fabs(msg.steer);
+
+		  drive_pub.publish(msg);         
+		}       
       }       
     }
     else if (STATE == "RETRIEVE")
