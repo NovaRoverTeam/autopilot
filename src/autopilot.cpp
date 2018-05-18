@@ -444,7 +444,7 @@ int main(int argc, char **argv)
 
 		  drive_pub.publish(msg);         
 		}       
-      }       
+             
     }
     else if (STATE == "RETRIEVE")
     {
