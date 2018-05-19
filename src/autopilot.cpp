@@ -55,6 +55,7 @@ bool disable_lidar = 0; // ROS parameter
 bool glen_enabled = 0;
 
 latlng retrieval_dest; // Retrieval destination
+bool retrieval_flag;
 
 //--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--
 // Setup:
@@ -72,6 +73,7 @@ void Setup()
   MAX_SPD = 0.3; // 30% max speed
 
   msg_cnt = 0;
+  retrieval_flag = 0; // Set high to enable retrieval publishing
 
   autopilot::grid_size srv; // Create service message
   bool success = false;  
@@ -227,6 +229,8 @@ bool Set_Dest(autopilot::set_dest::Request  &req,
               autopilot::set_dest::Response &res)
 {   
   ROS_INFO_STREAM("\nAttempting to begin destination publishing.");
+  
+  retrieval_flag = true; // Enable retrieval msg publishing
 
   retrieval_dest.latitude = req.destination.latitude;
   retrieval_dest.longitude = req.destination.longitude;
@@ -365,6 +369,9 @@ int main(int argc, char **argv)
 
   Setup(); // Initialise vars and get grid sizes
 
+  int retrieve_time = 1*LOOP_HZ - 1;
+  int retrieve_cnt = 0;
+
   while (ros::ok())
   {
     string STATE; n->getParam("/STATE", STATE);
@@ -413,7 +420,7 @@ int main(int argc, char **argv)
           ROS_INFO_STREAM("\nArrived at wp #" << des_wp << "!");
 
           des_wp++; // Select next waypoint on route as new destination
-   
+
           if (des_wp >= n_wps) // If we have arrived at the final waypoint
           {
             ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
@@ -424,29 +431,31 @@ int main(int argc, char **argv)
 
         // Find angle we need to turn to get on course
         double des_angle = Angle_Between(rover_pos, route[des_wp]) - bearing;
-      
+
         // Create ROS msg for drive command
         rover::DriveCmd msg;
 
-        
         msg.steer = fclamp(100*des_angle/MAX_ANGLE, 100.0, -100.0);
         msg.acc = 100 - fabs(msg.steer);
 
-        drive_pub.publish(msg);         
-      }       
+        drive_pub.publish(msg);
+      }
     }
-    else if (STATE == "RETRIEVE")
+
+    if (retrieval_flag && retrieve_cnt > retrieve_time)
     {
       rover::Retrieve msg;
       msg.bearing = Angle_Between(rover_pos, retrieval_dest);
-      
+
       double dist;
       Arrived(rover_pos, retrieval_dest, &dist);
       msg.distance = dist;
 
       dest_pub.publish(msg);
+      retrieve_cnt = 0;
     }
 
+    retrieve_cnt++;
     msg_cnt++;
 
     ros::spinOnce();
