@@ -399,102 +399,59 @@ int main(int argc, char **argv)
     }
 
     if (STATE == "AUTO")
-    {
-<<<<<<< HEAD
-      if (AUTO_STATE == "AVOID") // LIDAR takes priority
-      {
-        // Create ROS msg for drive command
-        rover::DriveCmd msg;
+    {     
+	if (AUTO_STATE == "AVOID") // LIDAR takes priority
+	{
+	  // Create ROS msg for drive command
+	  rover::DriveCmd msg;
 
-        // Turn and/or drive
-        msg.steer = fclamp(100*lidar_angle/MAX_ANGLE, 100.0, -100.0);
-        if (lidar_reverse) msg.acc = 0.5*(100 - fabs(msg.steer));
-        else               msg.acc = 100 - fabs(msg.steer);
+	  // Turn and/or drive
+	  msg.steer = fclamp(100*lidar_angle/MAX_ANGLE, 100.0, -100.0);
+	  msg.acc = 0;
 
-        drive_pub.publish(msg); 
-      }
-      else if (AUTO_STATE == "TRAVERSE")
-      {        
-        // If arrived at wp, set next wp as destination or start ball search
-        if (Arrived(rover_pos, route[des_wp], &proximity)) 
-        {
-          ROS_INFO_STREAM("\nArrived at wp #" << des_wp << "!");
+	  drive_pub.publish(msg); 
+	}
+	else if (AUTO_STATE == "JUST_AVOIDED")
+	{
+	    // Create ROS msg for drive command
+	  rover::DriveCmd msg;
 
-          des_wp++; // Select next waypoint on route as new destination
+	  // Turn and/or drive
+	  msg.steer = 0;
+	  msg.acc =  50;
 
-          if (des_wp >= n_wps) // If we have arrived at the final waypoint
-          {
-            ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
+	  drive_pub.publish(msg); 
+	}
+	else if (AUTO_STATE == "TRAVERSE")
+	{        
+	  // If arrived at wp, set next wp as destination or start ball search
+	  if (Arrived(rover_pos, route[des_wp], &proximity)) 
+	  {
+	    ROS_INFO_STREAM("\nArrived at wp #" << des_wp << "!");
 
-            n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
-          }
-        }
+	    des_wp++; // Select next waypoint on route as new destination
 
-        // Find angle we need to turn to get on course
-        double des_angle = Angle_Between(rover_pos, route[des_wp]) - bearing;
+	    if (des_wp >= n_wps) // If we have arrived at the final waypoint
+	    {
+	      ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
 
-        // Create ROS msg for drive command
-        rover::DriveCmd msg;
+	      n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
+	    }
+	  }
 
-        msg.steer = fclamp(100*des_angle/MAX_ANGLE, 100.0, -100.0);
-        msg.acc = 100 - fabs(msg.steer);
+	  // Find angle we need to turn to get on course
+	  double des_angle = Angle_Between(rover_pos, route[des_wp]) - bearing;
 
-        drive_pub.publish(msg);
-      }
-=======
-		if (AUTO_STATE == "AVOID") // LIDAR takes priority
-		{
-		  // Create ROS msg for drive command
-		  rover::DriveCmd msg;
+	  // Create ROS msg for drive command
+	  rover::DriveCmd msg;
 
-		  // Turn and/or drive
-		  msg.steer = fclamp(100*lidar_angle/MAX_ANGLE, 100.0, -100.0);
-		  msg.acc = 0;
+	  
+	  msg.steer = fclamp(100*des_angle/MAX_ANGLE, 100.0, -100.0);
+	  msg.acc = 100 - fabs(msg.steer);
 
-		  drive_pub.publish(msg); 
-		}
-		else if (AUTO_STATE == "JUST_AVOIDED")
-		{
-		    // Create ROS msg for drive command
-		  rover::DriveCmd msg;
-
-		  // Turn and/or drive
-		  msg.steer = 0;
-		  msg.acc = 100;
-
-		  drive_pub.publish(msg); 
-		}
-		else if (AUTO_STATE == "TRAVERSE")
-		{        
-		  // If arrived at wp, set next wp as destination or start ball search
-		  if (Arrived(rover_pos, route[des_wp], &proximity)) 
-		  {
-		    ROS_INFO_STREAM("\nArrived at wp #" << des_wp << "!");
-
-		    des_wp++; // Select next waypoint on route as new destination
-
-		    if (des_wp >= n_wps) // If we have arrived at the final waypoint
-		    {
-		      ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
-
-		      n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
-		    }
-		  }
-
-		  // Find angle we need to turn to get on course
-		  double des_angle = Angle_Between(rover_pos, route[des_wp]) - bearing;
-
-		  // Create ROS msg for drive command
-		  rover::DriveCmd msg;
-
-		  
-		  msg.steer = fclamp(100*des_angle/MAX_ANGLE, 100.0, -100.0);
-		  msg.acc = 100 - fabs(msg.steer);
-
-		  drive_pub.publish(msg);         
-		}       
+	  drive_pub.publish(msg);         
+	}       
              
->>>>>>> 6161578b6ca0e361d3f798157e37b33f38fecf2d
     }
 
     if (retrieval_flag && retrieve_cnt > retrieve_time)
