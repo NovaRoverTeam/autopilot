@@ -104,8 +104,6 @@ double fclamp(double value, double max, double min)
 
 
 
-
-
 //--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--..--**--
 // Angle_Between:
 //    Work out bearing between two GPS coordinates, deg clk from North.
@@ -439,12 +437,26 @@ int main(int argc, char **argv)
 	    }
 	  }
 
-	  // Find angle we need to turn to get on course
-	  double des_angle = Angle_Between(rover_pos, route[des_wp]) - bearing;
+          // Take bearing to 0 degrees
+          double bearing_to_360 = 360 - bearing;
+
+	  // Find difference between 0 degrees and the destination angle after
+          //   shifting it by the same amount as the bearing
+	  double des_angle_raw = Angle_Between(rover_pos, route[des_wp])
+                                 + bearing_to_360;
+
+          // Make sure the value is in the range 0 to 360
+          if (des_angle_raw > 360) des_angle_raw -= 360;
+
+          // The desired relative angle to change by
+          double des_angle = 0; 
+
+          // Find relative angle
+          if (des_angle_raw > 180) des_angle = 360 - des_angle_raw;
+          else                     des_angle = des_angle_raw;
 
 	  // Create ROS msg for drive command
 	  rover::DriveCmd msg;
-
 	  
 	  msg.steer = fclamp(100*des_angle/MAX_ANGLE, 100.0, -100.0);
 	  msg.acc = 100 - fabs(msg.steer);
