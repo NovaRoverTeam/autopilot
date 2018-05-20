@@ -263,7 +263,7 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
     bool bit1 = raw & 0b00100010; // Middle third
     bool bit0 = raw & 0b00010001; // Right third
 
-    if (bit3) {
+    if (bit3) { // If something is too close 
       n->setParam("/AUTO_STATE", "AVOID");
       // If something LEFT, turn RIGHT
       if (bit2 && !bit0) lidar_angle = LIDAR_TURN;
@@ -276,14 +276,15 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
       else lidar_angle = -LIDAR_TURN;
       }
     }
-    else if (STATE == "AVOID"){
+    else if (STATE == "AVOID"){ // If something is already not too close
       n->setParam("/AUTO_STATE", "JUST_AVOIDED");
     }
     else if (STATE == "JUST_AVOIDED"){
-      if (raw == 0){
+      if (!bit1){ // If something has moved away from the center
         n->setParam("/AUTO_STATE", "TRAVERSE");
       }
     }
+    //All gucci
     else n->setParam("/AUTO_STATE", "TRAVERSE");
   }
 }
