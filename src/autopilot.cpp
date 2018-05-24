@@ -22,6 +22,7 @@ using namespace std;
 ros::NodeHandle* n;
 ros::ServiceClient auto_client;
 ros::ServiceClient grid_client;
+ros::Subscriber LIDAR_sub; 
 
 typedef unsigned char byte;
 
@@ -64,8 +65,6 @@ bool retrieval_flag;
 void Setup()
 {
   des_wp = 0; // Start at the first waypoint
-
-  disable_lidar; // Enable the LIDAR
 
   WP_THRES = 10; // Distance in metres that counts as a wp being reached
   LIDAR_TURN = 90; // Try to turn 90 deg
@@ -155,8 +154,13 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     srv.request.distance = req.distance;
   }
 
+  glen_enabled = srv.request.glen_enabled;
+  disable_lidar = srv.request.disable_lidar;
+ 
   ros::WallTime start_, end_; // Measure Glen execution time
   
+  route.clear(); // Reset the route vector
+
   // Call the service Calc_Route, measuring time
   if(glen_enabled)
   {
@@ -338,9 +342,8 @@ int main(int argc, char **argv)
   //n->getParam("disable_lidar", disable_lidar);
   //ROS_INFO_STREAM("disable_lidar " << disable_lidar);
    
-  //if (!disable_lidar)
-  ros::Subscriber LIDAR_sub = 
-    n->subscribe("/shortRangeNav", 1, LIDAR_cb);
+  if (!disable_lidar)
+    LIDAR_sub = n->subscribe("/shortRangeNav", 1, LIDAR_cb);
 
   ros::Subscriber gps_sub = 
     n->subscribe("/gps/gps_data", 1, GPS_cb);
@@ -434,8 +437,7 @@ int main(int argc, char **argv)
 	    {
 	      ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
 
-	      n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
-	    }
+              n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
 	  }
 
           // Take bearing to 0 degrees
@@ -464,7 +466,7 @@ int main(int argc, char **argv)
 
 	  drive_pub.publish(msg);         
 	}       
-             
+      }       
     }
 
     if (retrieval_flag && retrieve_cnt > retrieve_time)
