@@ -1,5 +1,8 @@
 # Service request
 
+bool glen_enabled
+bool disable_lidar
+
 # GPS coordinate of the destination to autonomously navigate to. 
 bool latlng         # True means GPS coordinate, False means bearing + distance
 gps/Gps destination # GPS coordinate of destination

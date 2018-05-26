@@ -92,6 +92,8 @@ void Setup()
   grid_size = 10;
   lat_size = srv.response.lat_size; // Store the grid unit sizes
   long_size = srv.response.long_size;
+
+  ROS_INFO_STREAM("lat size " << lat_size);
 }
 
 
@@ -189,14 +191,28 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
       route.push_back(ll_coord);
     }
   }
-  else
+  else // If Glen disabled
   {
     latlng coord1;
     coord1.latitude   = rover_pos.latitude;
     coord1.longitude  = rover_pos.longitude;
+
     latlng coord2;
-    coord2.latitude   = req.destination.latitude;
-    coord2.longitude  = req.destination.longitude;
+    if (req.latlng == true)
+    {
+      coord2.latitude   = req.destination.latitude;
+      coord2.longitude  = req.destination.longitude;
+    }
+    else // bearing + distance format
+    {
+      coord2.latitude  = (req.distance/lat_size)*cos(M_PI*bearing/180.0);
+      coord2.longitude = (req.distance/long_size)*sin(M_PI*bearing/180.0);
+    }
+
+    ROS_INFO_STREAM("coord2 lat "  << coord2.latitude);
+    ROS_INFO_STREAM("coord2 long " << coord2.longitude);
+
+    // Simple interpolation
     for (int j=20; j<=100; j=j+20)
     {
       latlng ll_coord;
