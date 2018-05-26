@@ -22,6 +22,7 @@ using namespace std;
 ros::NodeHandle* n;
 ros::ServiceClient auto_client;
 ros::ServiceClient grid_client;
+ros::Subscriber LIDAR_sub; 
 
 typedef unsigned char byte;
 
@@ -64,8 +65,6 @@ bool retrieval_flag;
 void Setup()
 {
   des_wp = 0; // Start at the first waypoint
-
-  disable_lidar; // Enable the LIDAR
 
   WP_THRES = 10; // Distance in metres that counts as a wp being reached
   LIDAR_TURN = 90; // Try to turn 90 deg
@@ -157,8 +156,13 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     srv.request.distance = req.distance;
   }
 
+  glen_enabled = srv.request.glen_enabled;
+  disable_lidar = srv.request.disable_lidar;
+ 
   ros::WallTime start_, end_; // Measure Glen execution time
   
+  route.clear(); // Reset the route vector
+
   // Call the service Calc_Route, measuring time
   if(glen_enabled)
   {
@@ -279,7 +283,7 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
     bool bit1 = raw & 0b00100010; // Middle third
     bool bit0 = raw & 0b00010001; // Right third
 
-    if (bit3) {
+    if (bit3) { // If something is too close 
       n->setParam("/AUTO_STATE", "AVOID");
       // If something LEFT, turn RIGHT
       if (bit2 && !bit0) lidar_angle = LIDAR_TURN;
@@ -292,14 +296,15 @@ void LIDAR_cb(const std_msgs::Byte::ConstPtr& msg)
       else lidar_angle = -LIDAR_TURN;
       }
     }
-    else if (STATE == "AVOID"){
+    else if (STATE == "AVOID"){ // If something is already not too close
       n->setParam("/AUTO_STATE", "JUST_AVOIDED");
     }
     else if (STATE == "JUST_AVOIDED"){
-      if (raw == 0){
+      if (!bit1){ // If something has moved away from the center
         n->setParam("/AUTO_STATE", "TRAVERSE");
       }
     }
+    //All gucci
     else n->setParam("/AUTO_STATE", "TRAVERSE");
   }
 }
@@ -353,9 +358,8 @@ int main(int argc, char **argv)
   //n->getParam("disable_lidar", disable_lidar);
   //ROS_INFO_STREAM("disable_lidar " << disable_lidar);
    
-  //if (!disable_lidar)
-  ros::Subscriber LIDAR_sub = 
-    n->subscribe("/shortRangeNav", 1, LIDAR_cb);
+  if (!disable_lidar)
+    LIDAR_sub = n->subscribe("/shortRangeNav", 1, LIDAR_cb);
 
   ros::Subscriber gps_sub = 
     n->subscribe("/gps/gps_data", 1, GPS_cb);
@@ -449,8 +453,7 @@ int main(int argc, char **argv)
 	    {
 	      ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
 
-	      n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
-	    }
+              n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
 	  }
 
           // Take bearing to 0 degrees
@@ -479,7 +482,7 @@ int main(int argc, char **argv)
 
 	  drive_pub.publish(msg);         
 	}       
-             
+      }       
     }
 
     if (retrieval_flag && retrieve_cnt > retrieve_time)
