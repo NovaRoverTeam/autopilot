@@ -89,8 +89,8 @@ void Setup()
 
   //grid_size = srv.response.grid_size;
   grid_size = 10;
-  lat_size = srv.response.lat_size; // Store the grid unit sizes
-  long_size = srv.response.long_size;
+  lat_size = fabs(srv.response.lat_size); // Store the grid unit sizes
+  long_size = fabs(srv.response.long_size);
 
   ROS_INFO_STREAM("lat size " << lat_size);
 }
@@ -144,7 +144,7 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
   autopilot::calc_route srv; // Create service message
 
   // Forward the request to the Calc_Route service
-  if (req.latlng = true)
+  if (req.latlng == true)
   {
     srv.request.latlng = true;
     srv.request.destination = req.destination;
@@ -162,6 +162,9 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
   ros::WallTime start_, end_; // Measure Glen execution time
   
   route.clear(); // Reset the route vector
+  des_wp = 0;
+
+ float actual_angle ;
 
   // Call the service Calc_Route, measuring time
   if(glen_enabled)
@@ -176,6 +179,8 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
 
       double exe_time = (end_ - start_).toSec();
       ROS_INFO_STREAM("Glen execution time (s): " << exe_time << ".");
+      
+      n->setParam("/STATE", "AUTO"); // Set auto state
     }
     else 
       ROS_INFO("\n-- Failed to retrieve waypoint route."); 
@@ -209,13 +214,14 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     }
     else // bearing + distance format
     {
-      coord2.latitude  = (req.distance/lat_size)*cos(M_PI*bearing/180.0);
-      coord2.longitude = (req.distance/long_size)*sin(M_PI*bearing/180.0);
+      actual_angle = (M_PI/180.0)*(90 + (360 - req.bearing));
+
+      coord2.latitude  = rover_pos.latitude 
+        + lat_size*(req.distance/grid_size)*sin(actual_angle);
+      coord2.longitude = rover_pos.longitude 
+        + long_size*(req.distance/grid_size)*cos(actual_angle);
     }
-
-    ROS_INFO_STREAM("coord2 lat "  << coord2.latitude);
-    ROS_INFO_STREAM("coord2 long " << coord2.longitude);
-
+    
     // Simple interpolation
     for (int j=20; j<=100; j=j+20)
     {
@@ -228,6 +234,8 @@ bool Start_Auto(autopilot::calc_route::Request  &req,
     }
 
     n_wps = route.size();
+
+    n->setParam("/STATE", "AUTO"); // Set auto state
   }
 
   ROS_INFO_STREAM("Route has " << n_wps << " waypoints.");
@@ -396,28 +404,31 @@ int main(int argc, char **argv)
     string AUTO_STATE; n->getParam("/AUTO_STATE", AUTO_STATE);
     double proximity; // Distance to wp, for debugging 
 
-    if ((msg_cnt > LOOP_HZ*MSG_PERIOD) && route.size() > 0)
-    {
-      ROS_INFO_STREAM("AUTO_STATE is " << AUTO_STATE);
-      ROS_INFO_STREAM("\nHeading towards wp #" << des_wp 
-        << ",\n  at  latitude  " << route[des_wp].latitude
-        << ",\n  and longitude " << route[des_wp].longitude << ".");
+    ROS_INFO_STREAM("State is " << STATE << ", autostate is " << AUTO_STATE);
 
-      ROS_INFO_STREAM("\nRelative angle to destination is " 
+    if (STATE == "AUTO")
+    {  
+        if (msg_cnt > LOOP_HZ*MSG_PERIOD)  
+        {
+          ROS_INFO_STREAM("AUTO_STATE is " << AUTO_STATE);
+          ROS_INFO_STREAM("\nHeading towards wp #" << des_wp 
+                      << ",\n  at  latitude  " << route[des_wp].latitude
+                      << ",\n  and longitude " << route[des_wp].longitude << ".");
+
+          ROS_INFO_STREAM("\nRelative angle to destination is " 
                       << Angle_Between(rover_pos, route[des_wp]) - bearing
                       << "\nProximity is " << proximity << " metres.");
 
-      ROS_INFO_STREAM("\nDelta pos is lat  "  
+          ROS_INFO_STREAM("\nDelta pos is lat  "  
                       << route[des_wp].latitude - rover_pos.latitude
                       << ",\n             long " 
                       << route[des_wp].latitude - rover_pos.latitude 
                       << ".");
 
-      msg_cnt = 0;
-    }
+          msg_cnt = 0;
+        }
 
-    if (STATE == "AUTO")
-    {     
+   
 	if (AUTO_STATE == "AVOID") // LIDAR takes priority
 	{
 	  // Create ROS msg for drive command
@@ -441,7 +452,7 @@ int main(int argc, char **argv)
 	  drive_pub.publish(msg); 
 	}
 	else if (AUTO_STATE == "TRAVERSE")
-	{        
+	{ 
 	  // If arrived at wp, set next wp as destination or start ball search
 	  if (Arrived(rover_pos, route[des_wp], &proximity)) 
 	  {
@@ -454,7 +465,8 @@ int main(int argc, char **argv)
 	      ROS_INFO("\nFinal waypoint reached! Beginning search for ball.");
 
               n->setParam("/AUTO_STATE", "SEARCH"); // Begin search for ball
-	  }
+            }	  
+          }
 
           // Take bearing to 0 degrees
           double bearing_to_360 = 360 - bearing;
@@ -471,8 +483,10 @@ int main(int argc, char **argv)
           double des_angle = 0; 
 
           // Find relative angle
-          if (des_angle_raw > 180) des_angle = 360 - des_angle_raw;
+          if (des_angle_raw > 180) des_angle = -(360 - des_angle_raw);
           else                     des_angle = des_angle_raw;
+
+          ROS_INFO_STREAM("des_angle is " << des_angle);
 
 	  // Create ROS msg for drive command
 	  rover::DriveCmd msg;
@@ -480,10 +494,11 @@ int main(int argc, char **argv)
 	  msg.steer = fclamp(100*des_angle/MAX_ANGLE, 100.0, -100.0);
 	  msg.acc = 100 - fabs(msg.steer);
 
-	  drive_pub.publish(msg);         
+	  drive_pub.publish(msg); ROS_INFO("pubbing auto cmd");         
 	}       
-      }       
+         
     }
+    else n->setParam("/AUTO_STATE", "STANDBY");
 
     if (retrieval_flag && retrieve_cnt > retrieve_time)
     {
